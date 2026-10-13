@@ -1,7 +1,6 @@
 ---
 name: implement
 description: Builds the next ticket (or a named ticket) from docs/tickets/, checks the build, commits and pushes so the live site updates, and explains what changed in plain English. Use when the team is ready to write code.
-disable-model-invocation: true
 ---
 
 <!-- Adapted from implement in mattpocock/skills (MIT). -->

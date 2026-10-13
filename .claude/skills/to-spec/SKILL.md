@@ -1,7 +1,6 @@
 ---
 name: to-spec
 description: Turns the team's validated problem (docs/PROBLEM.md) and the conversation so far into a short, buildable MVP spec in docs/SPEC.md. No interview, just synthesis. Use when the team is ready to move from idea to building.
-disable-model-invocation: true
 ---
 
 <!-- Adapted from to-spec in mattpocock/skills (MIT). -->

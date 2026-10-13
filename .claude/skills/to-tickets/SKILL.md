@@ -1,7 +1,6 @@
 ---
 name: to-tickets
 description: Breaks docs/SPEC.md into a short sequence of small, end-to-end tickets saved as files in docs/tickets/, always starting with getting the app live. Use after /to-spec, when the team is ready to plan the build session.
-disable-model-invocation: true
 ---
 
 <!-- Adapted from to-tickets in mattpocock/skills (MIT). -->

@@ -1,7 +1,6 @@
 ---
 name: grill-with-docs
 description: Relentless product-manager-style interview that stress-tests a team's problem and MVP plan before any code is written, then records the result in docs/PROBLEM.md. Use at the start of the workshop, or whenever a team's idea is vague, too big, or has not been checked against a real person.
-disable-model-invocation: true
 ---
 
 <!-- Adapted from grill-with-docs and grilling in mattpocock/skills (MIT). -->

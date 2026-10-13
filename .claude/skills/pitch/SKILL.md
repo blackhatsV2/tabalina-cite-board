@@ -1,7 +1,6 @@
 ---
 name: pitch
 description: Turns docs/PROBLEM.md into a tight three-minute spoken pitch for the Session 1 presentation, plus the hardest questions the room is likely to ask. Use when a team needs to present their problem and planned solution.
-disable-model-invocation: true
 ---
 
 Read `docs/PROBLEM.md`. If it does not exist, stop and tell the team to
