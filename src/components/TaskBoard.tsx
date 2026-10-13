@@ -35,6 +35,8 @@ export type Task = {
   remarks?: string | null;
   is_confirmed: boolean;
   confirmed_at: string | null;
+  accepted_at?: string | null;
+  completed_at?: string | null;
   oic_approval: string;
   dean_approval: string;
   is_demo?: boolean | null;
@@ -142,6 +144,53 @@ export function combineDateTime(isoDate: string, time24: string): string {
   const t = formatDisplayTime(time24);
   if (d && t) return `${d}, ${t}`;
   return d || t || "";
+}
+
+export function formatTimestamp(isoStr?: string | null): string {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "";
+  }
+}
+
+export function TaskTimelineBadges({ task }: { task: Task }) {
+  const postedAt = formatTimestamp(task.created_at);
+  const acceptedAt = formatTimestamp(task.accepted_at || task.confirmed_at);
+  const finishedAt = formatTimestamp(task.completed_at);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-[11px]">
+      {postedAt && (
+        <span className="inline-flex items-center gap-1 rounded bg-muted/70 px-2 py-0.5 text-muted-foreground border border-border/60">
+          <span className="font-semibold text-foreground">Posted:</span>
+          <span>{postedAt}</span>
+        </span>
+      )}
+      {acceptedAt && (
+        <span className="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40">
+          <span className="font-semibold">Accepted:</span>
+          <span>{acceptedAt}</span>
+        </span>
+      )}
+      {finishedAt && (
+        <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40">
+          <span className="font-semibold">Finished:</span>
+          <span>{finishedAt}</span>
+        </span>
+      )}
+    </div>
+  );
 }
 
 interface TaskBoardProps {
@@ -469,6 +518,8 @@ export function TaskBoard({
       decline_reason: null,
       is_confirmed: false,
       confirmed_at: null,
+      accepted_at: null,
+      completed_at: null,
     };
 
     const supabase = createClient();
@@ -805,6 +856,7 @@ export function TaskBoard({
         status: "accepted",
         is_confirmed: true,
         confirmed_at: confirmedTime,
+        accepted_at: confirmedTime,
         decline_reason: null,
       };
 
@@ -848,6 +900,7 @@ export function TaskBoard({
                 status: "accepted",
                 is_confirmed: true,
                 confirmed_at: confirmedTime,
+                accepted_at: confirmedTime,
                 decline_reason: null,
               }
             : t
@@ -869,11 +922,13 @@ export function TaskBoard({
   // ==============================================================
   const handleResolveTask = async (taskId: string) => {
     setActionLoadingTaskId(taskId);
+    const completedTime = new Date().toISOString();
     const supabase = createClient();
 
     try {
       const updatePayload = {
         status: "completed",
+        completed_at: completedTime,
       };
 
       const { error } = await supabase
@@ -896,6 +951,7 @@ export function TaskBoard({
             ? {
                 ...t,
                 status: "completed",
+                completed_at: completedTime,
               }
             : t
         )
@@ -1371,6 +1427,8 @@ export function TaskBoard({
                                     {task.description}
                                   </div>
                                 )}
+
+                                <TaskTimelineBadges task={task} />
 
                                 {/* Action Buttons: Edit, Delete */}
                                 <div className="flex items-center justify-between pt-2 border-t border-border flex-wrap gap-2">
@@ -1877,6 +1935,7 @@ export function TaskBoard({
                                               <strong>Description:</strong> {t.description}
                                             </div>
                                           )}
+                                          <TaskTimelineBadges task={t} />
                                           {tStatus === "declined" && t.decline_reason && (
                                             <div className="text-rose-700 italic">
                                               <strong>Decline Reason:</strong> {t.decline_reason}
@@ -2034,6 +2093,8 @@ export function TaskBoard({
                                 <strong>Instructions:</strong> {task.description}
                               </p>
                             )}
+
+                            <TaskTimelineBadges task={task} />
 
                             {/* Task Year Level Selector (Separate from Profile) */}
                             <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg border border-border bg-background">
@@ -2304,6 +2365,8 @@ export function TaskBoard({
                               </p>
                             )}
 
+                            <TaskTimelineBadges task={task} />
+
                             {/* Task Year Level Selector (Separate from Profile) */}
                             <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg border border-border bg-background">
                               <div className="flex items-center gap-2">
@@ -2464,6 +2527,7 @@ export function TaskBoard({
                                   <strong>Details:</strong> {task.description}
                                 </div>
                               )}
+                              <TaskTimelineBadges task={task} />
                               <div className="pt-2 border-t border-border">
                                 <Button
                                   size="sm"
@@ -2579,6 +2643,7 @@ export function TaskBoard({
                                   <strong>Instructions:</strong> {task.description}
                                 </div>
                               )}
+                              <TaskTimelineBadges task={task} />
                               <div className="pt-2 border-t border-border">
                                 <Button
                                   size="sm"
