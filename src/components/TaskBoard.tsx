@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -292,6 +292,75 @@ export function TaskBoard({
     setCurrentUser(user);
     setUserRole(role);
   }, []);
+
+  // ==============================================================
+  // REAL-TIME AUTO-DETECTION & BACKGROUND SYNC
+  // ==============================================================
+  const fetchLatestData = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const [tasksRes, advisersRes, commentsRes] = await Promise.all([
+        supabase.from("tasks").select("*").order("created_at", { ascending: true }),
+        supabase.from("advisers").select("*").order("created_at", { ascending: true }),
+        supabase.from("comments").select("*").order("created_at", { ascending: true }),
+      ]);
+
+      if (tasksRes.data) setTasks(tasksRes.data);
+      if (advisersRes.data) setAdvisers(advisersRes.data);
+      if (commentsRes.data) setComments(commentsRes.data);
+    } catch {
+      // Gracefully ignore network hiccups in background polling
+    }
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    // 1. Supabase Realtime WebSocket subscription
+    const channel = supabase
+      .channel("cite-boardroom-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
+        () => {
+          fetchLatestData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comments" },
+        () => {
+          fetchLatestData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "advisers" },
+        () => {
+          fetchLatestData();
+        }
+      )
+      .subscribe();
+
+    // 2. Refetch when the user returns/focuses back on this browser tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchLatestData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 3. Fallback polling every 8 seconds in case Realtime publication is pending
+    const interval = setInterval(() => {
+      fetchLatestData();
+    }, 8000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [fetchLatestData]);
 
   // ==============================================================
   // ADMIN ACTIONS: Top "Assign a Task"
