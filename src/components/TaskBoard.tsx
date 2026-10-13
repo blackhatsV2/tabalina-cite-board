@@ -119,23 +119,54 @@ export function TaskBoard({
   // Faculty bottom section active tab ("finished" vs "other-faculties")
   const [bottomTab, setBottomTab] = useState<"finished" | "other-faculties">("finished");
 
-  const isAdmin = userRole === "dean" || userRole === "oic" || userRole === "admin";
+  const isAdmin =
+    userRole === "dean" ||
+    userRole === "oic" ||
+    userRole === "admin" ||
+    currentUser?.email?.toLowerCase() === "dean@gmail.com" ||
+    currentUser?.email?.toLowerCase() === "oic@gmail.com" ||
+    currentUser?.email?.toLowerCase() === "dean.admin@cite.edu" ||
+    currentUser?.email?.toLowerCase() === "oic.admin@cite.edu";
 
   // All three demo emails are sandboxed — they see ONLY demo tasks.
   // Real accounts (any other email) see ONLY non-demo tasks.
   const DEMO_EMAILS = new Set(["dean@gmail.com", "oic@gmail.com", "faculty@gmail.com"]);
   const isCurrentUserDemo = DEMO_EMAILS.has(currentUser?.email?.toLowerCase() ?? "");
 
+  const isTaskDemo = (t: Task): boolean => {
+    if (t.is_demo === true) return true;
+    if (t.is_demo === false) return false;
+    const assigned = advisers.find((a) => a.id === t.adviser_id);
+    if (assigned) {
+      if (assigned.is_demo === true) return true;
+      if (DEMO_EMAILS.has(assigned.email?.toLowerCase() ?? "")) return true;
+    }
+    // Any legacy task with no explicit flag belongs to the demo sandbox
+    return true;
+  };
+
+  const isAdviserDemo = (a: Adviser): boolean => {
+    if (a.is_demo === true) return true;
+    if (DEMO_EMAILS.has(a.email?.toLowerCase() ?? "")) return true;
+    return false;
+  };
+
   // Identify active faculty member for adviser view
   const activeAdviser =
     (currentUser &&
       advisers.find((a) => a.email?.toLowerCase() === currentUser.email?.toLowerCase())) ||
+    (isCurrentUserDemo
+      ? advisers.find((a) => a.email?.toLowerCase() === "faculty@gmail.com")
+      : advisers.find((a) => a.role !== "dean" && a.role !== "oic" && !isAdviserDemo(a))) ||
     advisers.find((a) => a.role !== "dean" && a.role !== "oic") ||
     advisers[0];
 
-  const assignableAdvisers = advisers.filter(
-    (a) => a.role !== "dean" && a.role !== "oic" && a.email !== "dean@gmail.com" && a.email !== "oic@gmail.com"
-  );
+  const assignableAdvisers = advisers.filter((a) => {
+    if (a.role === "dean" || a.role === "oic") return false;
+    if (a.email?.toLowerCase() === "dean.admin@cite.edu" || a.email?.toLowerCase() === "oic.admin@cite.edu") return false;
+    const isDemoAdv = isAdviserDemo(a);
+    return isCurrentUserDemo ? isDemoAdv : !isDemoAdv;
+  });
 
   const effectiveAuthorName =
     currentUser?.email === "dean@gmail.com"
@@ -185,6 +216,7 @@ export function TaskBoard({
         status: "assigned",
         oic_approval: isDean ? "approved" : "approved",
         dean_approval: isDean ? "approved" : "pending",
+        is_demo: isCurrentUserDemo,
       };
 
       const { data, error } = await supabase
@@ -203,6 +235,7 @@ export function TaskBoard({
           description: shortcutDesc.trim(),
           oic_approval: isDean ? "approved" : "approved",
           dean_approval: isDean ? "approved" : "pending",
+          is_demo: isCurrentUserDemo,
         };
         const { data: fallbackData, error: fallbackError } = await supabase
           .from("tasks")
@@ -480,6 +513,7 @@ export function TaskBoard({
         status: "assigned",
         oic_approval: isDean ? "approved" : "approved",
         dean_approval: isDean ? "approved" : "pending",
+        is_demo: isCurrentUserDemo,
       };
 
       const { data, error } = await supabase
@@ -497,6 +531,7 @@ export function TaskBoard({
           description: addUnderDesc.trim(),
           oic_approval: isDean ? "approved" : "approved",
           dean_approval: isDean ? "approved" : "pending",
+          is_demo: isCurrentUserDemo,
         };
         const { data: fallbackData } = await supabase
           .from("tasks")
@@ -702,9 +737,8 @@ export function TaskBoard({
   // ==============================================================
   // Demo accounts (all 3 preset emails) → see only demo tasks.
   // Real accounts (any other email) → see only real (non-demo) tasks.
-  // is_demo may be null/undefined before migration runs → treat as false.
   const visibleTasks = tasks.filter((t) => {
-    const isDemo = t.is_demo === true;
+    const isDemo = isTaskDemo(t);
     return isCurrentUserDemo ? isDemo : !isDemo;
   });
 
@@ -724,7 +758,14 @@ export function TaskBoard({
   // ==============================================================
   // DATA FILTERING FOR FACULTY DASHBOARD
   // ==============================================================
-  const myOwnTasks = visibleTasks.filter((t) => t.adviser_id === activeAdviser?.id);
+  const myOwnTasks = visibleTasks.filter((t) => {
+    if (t.adviser_id === activeAdviser?.id) return true;
+    if (isCurrentUserDemo) {
+      const assignedAdv = advisers.find((a) => a.id === t.adviser_id);
+      if (!t.adviser_id || assignedAdv?.email?.toLowerCase() === "faculty@gmail.com") return true;
+    }
+    return false;
+  });
 
   const facultyNewAssignedTasks = myOwnTasks.filter((t) => getTaskStatus(t) === "assigned");
 
@@ -1243,7 +1284,7 @@ export function TaskBoard({
               <div className="flex flex-col gap-2.5">
                 {assignableAdvisers.map((faculty) => {
                   const isExpanded = expandedFacultyId === faculty.id;
-                  const facultyTasks = tasks.filter((t) => t.adviser_id === faculty.id);
+                  const facultyTasks = visibleTasks.filter((t) => t.adviser_id === faculty.id);
                   const isAddingTask = addingTaskFacultyId === faculty.id;
 
                   return (
@@ -1526,6 +1567,16 @@ export function TaskBoard({
                                               <strong>Decline Reason:</strong> {t.decline_reason}
                                             </div>
                                           )}
+                                          <div className="flex justify-end pt-1">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => handleDeleteTask(t.id)}
+                                              className="text-[11px] h-6 px-2 text-rose-600 hover:bg-rose-50 border-rose-200"
+                                            >
+                                              Delete Task
+                                            </Button>
+                                          </div>
                                         </div>
                                       )}
                                     </div>

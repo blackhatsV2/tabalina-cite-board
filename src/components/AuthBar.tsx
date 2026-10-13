@@ -19,8 +19,8 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
   const resolveRole = async (userEmail?: string | null): Promise<UserRole> => {
     if (!userEmail) return "adviser";
     const cleanEmail = userEmail.toLowerCase().trim();
-    if (cleanEmail === "dean@gmail.com") return "dean";
-    if (cleanEmail === "oic@gmail.com") return "oic";
+    if (cleanEmail === "dean.admin@cite.edu" || cleanEmail === "dean@gmail.com") return "dean";
+    if (cleanEmail === "oic.admin@cite.edu" || cleanEmail === "oic@gmail.com") return "oic";
     try {
       const supabase = createClient();
       const { data } = await supabase
@@ -40,9 +40,14 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
     if (!u) return "";
     const cleanEmail = u.email?.toLowerCase().trim() ?? "";
 
-    // Hardcoded real admin display names
-    if (cleanEmail === "dean@gmail.com") return "Dean Admin";
-    if (cleanEmail === "oic@gmail.com") return "OIC Admin";
+    // Real Admin display names
+    if (cleanEmail === "dean.admin@cite.edu") return "Dean Admin";
+    if (cleanEmail === "oic.admin@cite.edu") return "OIC Admin";
+
+    // Demo accounts
+    if (cleanEmail === "dean@gmail.com") return "Dean (Demo)";
+    if (cleanEmail === "oic@gmail.com") return "OIC (Demo)";
+    if (cleanEmail === "faculty@gmail.com") return "Faculty Member (Demo)";
 
     // Try full_name from auth metadata
     const meta = u.user_metadata;

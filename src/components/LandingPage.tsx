@@ -27,6 +27,18 @@ export function LandingPage() {
     setLastName("");
   };
 
+  const normalizeEmail = (raw: string) => {
+    const val = raw.trim();
+    const lower = val.toLowerCase();
+    if (lower === "dean admin" || lower === "dean" || lower === "dean.admin") {
+      return "dean.admin@cite.edu";
+    }
+    if (lower === "oic admin" || lower === "oic" || lower === "oic.admin") {
+      return "oic.admin@cite.edu";
+    }
+    return val;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -36,7 +48,47 @@ export function LandingPage() {
 
     try {
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const loginEmail = normalizeEmail(email);
+        let { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
+
+        // Auto-provision default real admins if first time signing in
+        if (
+          error &&
+          password === "password123" &&
+          (loginEmail === "dean.admin@cite.edu" || loginEmail === "oic.admin@cite.edu")
+        ) {
+          const isAdminDean = loginEmail === "dean.admin@cite.edu";
+          const adminName = isAdminDean ? "Dean Admin" : "OIC Admin";
+          const adminRole = isAdminDean ? "dean" : "oic";
+
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: loginEmail,
+            password: "password123",
+            options: { data: { full_name: adminName } },
+          });
+
+          if (!signUpError) {
+            try {
+              await supabase.from("advisers").upsert(
+                {
+                  name: adminName,
+                  year_level: "Admin",
+                  email: loginEmail,
+                  role: adminRole,
+                  is_demo: false,
+                },
+                { onConflict: "email" }
+              );
+            } catch { /* ignore */ }
+
+            const { error: retryError } = await supabase.auth.signInWithPassword({
+              email: loginEmail,
+              password: "password123",
+            });
+            error = retryError;
+          }
+        }
+
         if (error) {
           setMessage({ type: "error", text: error.message });
         } else {
@@ -53,12 +105,21 @@ export function LandingPage() {
           setMessage({ type: "error", text: error.message });
         } else {
           try {
-            await supabase.from("advisers").insert({
-              name: fullName,
-              year_level: yearLevel,
-              email: email.toLowerCase().trim(),
-              role: "adviser",
-            });
+            const { data: existing } = await supabase
+              .from("advisers")
+              .select("role")
+              .eq("email", email.toLowerCase().trim())
+              .maybeSingle();
+
+            if (!existing) {
+              await supabase.from("advisers").insert({
+                name: fullName,
+                year_level: yearLevel,
+                email: email.toLowerCase().trim(),
+                role: "adviser",
+                is_demo: false,
+              });
+            }
           } catch { /* ignore if already exists */ }
 
           if (data.user && !data.session) {
@@ -84,7 +145,7 @@ export function LandingPage() {
 
     if (error) {
       const demoRole = demoEmail === "dean@gmail.com" ? "dean" : demoEmail === "oic@gmail.com" ? "oic" : "adviser";
-      const demoName = demoEmail === "dean@gmail.com" ? "Dean" : demoEmail === "oic@gmail.com" ? "OIC Coordinator" : "Faculty Member";
+      const demoName = demoEmail === "dean@gmail.com" ? "Dean (Demo)" : demoEmail === "oic@gmail.com" ? "OIC (Demo)" : "Faculty Member";
 
       const { error: signUpError } = await supabase.auth.signUp({
         email: demoEmail,
@@ -97,21 +158,22 @@ export function LandingPage() {
         return;
       }
       try {
-        await supabase.from("advisers").insert({
+        await supabase.from("advisers").upsert({
           name: demoName,
           year_level: demoRole === "adviser" ? "Year 1" : "Admin",
           email: demoEmail.toLowerCase().trim(),
           role: demoRole,
-        });
+          is_demo: true,
+        }, { onConflict: "email" });
       } catch { /* ignore */ }
     }
     window.location.reload();
   };
 
   const demoAccounts = [
-    { email: "dean@gmail.com", label: "Dean", sub: "Full admin access" },
-    { email: "oic@gmail.com", label: "OIC Coordinator", sub: "Admin access" },
-    { email: "faculty@gmail.com", label: "Faculty Member", sub: "Adviser view" },
+    { email: "dean@gmail.com", label: "Dean (Demo)", sub: "Sample admin board" },
+    { email: "oic@gmail.com", label: "OIC Coordinator (Demo)", sub: "Sample admin board" },
+    { email: "faculty@gmail.com", label: "Faculty Member (Demo)", sub: "Sample faculty view" },
   ];
 
   return (
@@ -213,11 +275,13 @@ export function LandingPage() {
             )}
 
             <div className="flex flex-col gap-1">
-              <Label htmlFor="lp-email" className="text-xs text-muted-foreground">Email Address</Label>
+              <Label htmlFor="lp-email" className="text-xs text-muted-foreground">
+                {mode === "signin" ? "Email or Account Name" : "Email Address"}
+              </Label>
               <Input
                 id="lp-email"
-                type="email"
-                placeholder="name@phinmaed.com"
+                type={mode === "signin" ? "text" : "email"}
+                placeholder={mode === "signin" ? "e.g. Dean Admin or name@cite.edu" : "name@phinmaed.com"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -236,6 +300,34 @@ export function LandingPage() {
                 className="h-9 text-sm"
               />
             </div>
+
+            {mode === "signin" && (
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground py-0.5">
+                <span>Default Admins:</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("Dean Admin");
+                      setPassword("password123");
+                    }}
+                    className="rounded border border-border bg-muted/60 px-2 py-0.5 font-medium hover:bg-muted text-foreground transition-colors"
+                  >
+                    Dean Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("OIC Admin");
+                      setPassword("password123");
+                    }}
+                    className="rounded border border-border bg-muted/60 px-2 py-0.5 font-medium hover:bg-muted text-foreground transition-colors"
+                  >
+                    OIC Admin
+                  </button>
+                </div>
+              </div>
+            )}
 
             {message && (
               <p
