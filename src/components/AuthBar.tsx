@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { User } from "@supabase/supabase-js";
 
-export type UserRole = "dean" | "oic" | "adviser";
+export type UserRole = "dean" | "oic" | "admin" | "adviser";
 
 interface AuthBarProps {
   onUserChange?: (user: User | null, role: UserRole) => void;
@@ -25,16 +25,30 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [yearLevel, setYearLevel] = useState("Year 2");
+  const [yearLevel, setYearLevel] = useState("Year 1");
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const determineRole = (userEmail?: string | null): UserRole => {
+  const resolveRole = async (userEmail?: string | null): Promise<UserRole> => {
     if (!userEmail) return "adviser";
     const cleanEmail = userEmail.toLowerCase().trim();
     if (cleanEmail === "dean@gmail.com") return "dean";
     if (cleanEmail === "oic@gmail.com") return "oic";
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("advisers")
+        .select("role")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+      if (data?.role === "dean") return "dean";
+      if (data?.role === "oic") return "oic";
+      if (data?.role === "admin") return "admin";
+      if (data?.role === "adviser") return "adviser";
+    } catch {
+      // fallback
+    }
     return "adviser";
   };
 
@@ -47,19 +61,19 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUser(user);
-      const userRole = determineRole(user?.email);
+      const userRole = await resolveRole(user?.email);
       setRole(userRole);
       onUserChangeRef.current?.(user, userRole);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      const userRole = determineRole(currentUser?.email);
+      const userRole = await resolveRole(currentUser?.email);
       setRole(userRole);
       onUserChangeRef.current?.(currentUser, userRole);
     });
@@ -116,7 +130,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
               name: fullName,
               year_level: yearLevel,
               email: email.toLowerCase().trim(),
-              role: determineRole(email),
+              role: "adviser",
             });
           } catch {
             // If already exists or error, continue
@@ -155,13 +169,18 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
 
     if (error) {
       // If user not yet created in Supabase Auth, attempt automatic sign up for instant demo experience
-      const demoRole = determineRole(demoEmail);
+      const demoRole: UserRole =
+        demoEmail === "dean@gmail.com"
+          ? "dean"
+          : demoEmail === "oic@gmail.com"
+          ? "oic"
+          : "adviser";
       const demoName =
         demoEmail === "dean@gmail.com"
           ? "Dean"
           : demoEmail === "oic@gmail.com"
           ? "OIC Coordinator"
-          : "Jayrold Tabalina";
+          : "Faculty Member";
 
       const signUpRes = await supabase.auth.signUp({
         email: demoEmail,
@@ -174,12 +193,23 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
       if (signUpRes.error) {
         setMessage({
           type: "error",
-          text: `Demo sign-in failed: ${signUpRes.error.message}. Please create the user in Supabase Auth or click Sign Up.`,
+          text: `Sign-in failed: ${signUpRes.error.message}. Please create the user in Supabase Auth or click Sign Up.`,
         });
       } else {
+        // Also ensure record exists in advisers table
+        try {
+          await supabase.from("advisers").insert({
+            name: demoName,
+            year_level: demoRole === "adviser" ? "Year 1" : "Admin",
+            email: demoEmail.toLowerCase().trim(),
+            role: demoRole,
+          });
+        } catch {
+          // If already exists, ignore
+        }
         setMessage({
           type: "success",
-          text: `Demo account initialized for ${demoEmail}!`,
+          text: `Account initialized for ${demoEmail}!`,
         });
         setTimeout(() => setIsOpen(false), 800);
       }
@@ -202,6 +232,8 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
         return <span className="rounded bg-purple-100 text-purple-800 px-1.5 py-0.5 font-bold uppercase text-[10px]">Dean (Admin)</span>;
       case "oic":
         return <span className="rounded bg-blue-100 text-blue-800 px-1.5 py-0.5 font-bold uppercase text-[10px]">OIC (Admin)</span>;
+      case "admin":
+        return <span className="rounded bg-indigo-100 text-indigo-800 px-1.5 py-0.5 font-bold uppercase text-[10px]">Admin</span>;
       default:
         return <span className="rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 font-semibold text-[10px]">Faculty Adviser</span>;
     }
@@ -293,7 +325,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
             <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
-                  ⚡ 1-Click Demo Accounts (password: password123)
+                  Quick Demo Accounts (Password: password123)
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -305,7 +337,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
                   onClick={() => handleQuickLogin("dean@gmail.com")}
                   className="h-7 text-[11px] bg-background"
                 >
-                  👔 Dean
+                  Dean (Admin)
                 </Button>
                 <Button
                   type="button"
@@ -315,17 +347,17 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
                   onClick={() => handleQuickLogin("oic@gmail.com")}
                   className="h-7 text-[11px] bg-background"
                 >
-                  📋 OIC (Assign Tasks)
+                  OIC (Admin)
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   disabled={loading}
-                  onClick={() => handleQuickLogin("jtabalina.ui@phinmaed.com")}
+                  onClick={() => handleQuickLogin("faculty@gmail.com")}
                   className="h-7 text-[11px] bg-background"
                 >
-                  🧑‍🏫 Adviser (J. Tabalina)
+                  Faculty Member (Dummy)
                 </Button>
               </div>
             </div>

@@ -117,7 +117,7 @@ export function TaskBoard({
   // Faculty bottom section active tab ("finished" vs "other-faculties")
   const [bottomTab, setBottomTab] = useState<"finished" | "other-faculties">("finished");
 
-  const isAdmin = userRole === "dean" || userRole === "oic";
+  const isAdmin = userRole === "dean" || userRole === "oic" || userRole === "admin";
 
   // Identify active faculty member for adviser view
   const activeAdviser =
@@ -127,7 +127,7 @@ export function TaskBoard({
     advisers[0];
 
   const assignableAdvisers = advisers.filter(
-    (a) => a.role !== "dean" && a.role !== "oic"
+    (a) => a.role !== "dean" && a.role !== "oic" && a.email !== "dean@gmail.com" && a.email !== "oic@gmail.com"
   );
 
   const effectiveAuthorName =
@@ -324,7 +324,12 @@ export function TaskBoard({
   // ==============================================================
   const handleApprovePendingTask = async (taskId: string) => {
     const isDean = userRole === "dean";
-    const updatePayload = isDean ? { dean_approval: "approved" } : { oic_approval: "approved" };
+    const isOic = userRole === "oic";
+    const updatePayload = isDean
+      ? { dean_approval: "approved" }
+      : isOic
+      ? { oic_approval: "approved" }
+      : { oic_approval: "approved", dean_approval: "approved" };
 
     const supabase = createClient();
     try {
@@ -343,6 +348,44 @@ export function TaskBoard({
   };
 
   // ==============================================================
+  // ==============================================================
+  // ADMIN ACTIONS: Toggle Admin Privileges for Faculty Member
+  // ==============================================================
+  const handleToggleAdminPrivilege = async (
+    facultyId: string,
+    currentRole?: string | null
+  ) => {
+    const newRole = currentRole === "admin" ? "adviser" : "admin";
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from("advisers")
+        .update({ role: newRole })
+        .eq("id", facultyId);
+
+      if (error) {
+        alert("Failed to update role privileges: " + error.message);
+        return;
+      }
+
+      setAdvisers((prev) =>
+        prev.map((a) => (a.id === facultyId ? { ...a, role: newRole } : a))
+      );
+
+      const target = advisers.find((a) => a.id === facultyId);
+      if (
+        currentUser &&
+        target &&
+        currentUser.email?.toLowerCase() === target.email?.toLowerCase()
+      ) {
+        setUserRole(newRole as UserRole);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error updating role";
+      alert("Error: " + msg);
+    }
+  };
+
   // ADMIN ACTIONS: Reassign Year Level for Faculty
   // ==============================================================
   const handleSaveReassignedYearLevel = async (adviserId: string) => {
@@ -676,7 +719,7 @@ export function TaskBoard({
                   Admin Dashboard
                 </span>
                 <h2 className="text-base font-bold text-primary sm:text-lg">
-                  {userRole === "dean" ? "College Dean Oversight" : "OIC Coordinator Command"}
+                  {userRole === "dean" ? "College Dean Oversight" : userRole === "oic" ? "OIC Coordinator Command" : "Admin Command Center"}
                 </h2>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -689,7 +732,7 @@ export function TaskBoard({
               onClick={() => setShowAssignShortcut(!showAssignShortcut)}
               className="text-xs font-semibold shadow-xs"
             >
-              {showAssignShortcut ? "✕ Close Form" : "➕ Assign a Task"}
+              {showAssignShortcut ? "Close Form" : "+ Assign a Task"}
             </Button>
           </div>
 
@@ -850,7 +893,7 @@ export function TaskBoard({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-foreground">⏳ Pending Tasks</span>
+                  <span className="text-base font-bold text-foreground">Pending Tasks</span>
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
                     {adminPendingTasks.length}
                   </span>
@@ -861,7 +904,7 @@ export function TaskBoard({
               {adminPendingTasks.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center text-xs text-muted-foreground">
-                    🎉 No pending tasks! All duties have either been completed or approved.
+                    No pending tasks! All duties have either been completed or approved.
                   </CardContent>
                 </Card>
               ) : (
@@ -893,7 +936,7 @@ export function TaskBoard({
                           <div className="flex flex-col gap-1 pr-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-xs font-bold text-primary">
-                                👤 {facultyName}
+                                {facultyName}
                               </span>
                               <span className="text-xs text-muted-foreground">•</span>
                               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
@@ -908,7 +951,7 @@ export function TaskBoard({
                           <div className="flex items-center gap-2 shrink-0">
                             {status === "declined" ? (
                               <span className="rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-800">
-                                Declined ✕
+                                Declined
                               </span>
                             ) : status === "accepted" ? (
                               <span className="rounded-full bg-blue-100 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-800">
@@ -916,11 +959,11 @@ export function TaskBoard({
                               </span>
                             ) : (
                               <span className="rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                                Pending Faculty ⏳
+                                Pending Faculty Review
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground">
-                              {isExpanded ? "▲" : "▼"}
+                              {isExpanded ? "Hide" : "Details"}
                             </span>
                           </div>
                         </div>
@@ -932,7 +975,7 @@ export function TaskBoard({
                             {status === "declined" && (
                               <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">
                                 <div className="font-bold flex items-center gap-1 mb-1">
-                                  ⚠️ Declined by {facultyName}
+                                  Declined by {facultyName}
                                 </div>
                                 <p className="italic">
                                   <strong>Reason:</strong> {task.decline_reason || "No reason specified."}
@@ -946,7 +989,7 @@ export function TaskBoard({
                             {/* Pending Faculty Notice */}
                             {status === "assigned" && (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
-                                ⏳ <strong>Status:</strong> Waiting for {facultyName} to review and accept/decline.
+                                <strong>Status:</strong> Waiting for {facultyName} to review and accept/decline.
                               </div>
                             )}
 
@@ -954,14 +997,14 @@ export function TaskBoard({
                             {status === "accepted" && (
                               <div className="rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900 flex items-center justify-between flex-wrap gap-2">
                                 <div>
-                                  ✓ <strong>Accepted by Faculty:</strong> Awaiting your administrative approval.
+                                  <strong>Accepted by Faculty:</strong> Awaiting your administrative approval.
                                 </div>
                                 <Button
                                   size="sm"
                                   onClick={() => handleApprovePendingTask(task.id)}
                                   className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
-                                  Approve as {userRole === "dean" ? "Dean" : "OIC"} ✓
+                                  Approve as {userRole === "dean" ? "Dean" : userRole === "oic" ? "OIC" : "Admin"}
                                 </Button>
                               </div>
                             )}
@@ -996,7 +1039,7 @@ export function TaskBoard({
                                       onClick={() => startEditTask(task)}
                                       className="text-xs h-8"
                                     >
-                                      ✏️ Edit Task
+                                      Edit Task
                                     </Button>
                                     <Button
                                       size="sm"
@@ -1004,7 +1047,7 @@ export function TaskBoard({
                                       onClick={() => handleDeleteTask(task.id)}
                                       className="text-xs h-8 text-rose-600 hover:bg-rose-50 border-rose-200"
                                     >
-                                      🗑️ Delete Task
+                                      Delete Task
                                     </Button>
                                   </div>
 
@@ -1018,7 +1061,7 @@ export function TaskBoard({
                                     }
                                     className="text-xs h-8"
                                   >
-                                    💬 Notes ({taskComments.length})
+                                    Notes ({taskComments.length})
                                   </Button>
                                 </div>
                               </div>
@@ -1026,7 +1069,7 @@ export function TaskBoard({
                               /* Inline Edit Form */
                               <div className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-background p-3.5 shadow-xs">
                                 <div className="font-bold text-xs text-primary">
-                                  ✏️ Edit & Reassign Task
+                                  Edit & Reassign Task
                                 </div>
 
                                 <div className="flex flex-col gap-1">
@@ -1152,7 +1195,7 @@ export function TaskBoard({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-foreground">👥 Faculty Directory</span>
+                  <span className="text-base font-bold text-foreground">Faculty Directory</span>
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
                     {assignableAdvisers.length}
                   </span>
@@ -1188,13 +1231,18 @@ export function TaskBoard({
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-xs">
-                            {faculty.name.charAt(0) || "👤"}
+                            {faculty.name.charAt(0) || "F"}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-semibold text-foreground">
                                 {faculty.name}
                               </span>
+                              {faculty.role === "admin" && (
+                                <span className="rounded bg-indigo-100 text-indigo-800 px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                                  Admin
+                                </span>
+                              )}
                               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                                 {faculty.year_level}
                               </span>
@@ -1218,7 +1266,7 @@ export function TaskBoard({
                             {facultyTasks.length}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {isExpanded ? "▲" : "▼"}
+                            {isExpanded ? "Hide" : "Details"}
                           </span>
                         </div>
                       </div>
@@ -1226,7 +1274,35 @@ export function TaskBoard({
                       {/* Expanded Faculty Actions */}
                       {isExpanded && (
                         <div className="border-t border-border p-4 bg-muted/10 flex flex-col gap-4">
-                          {/* 1. Reassign Year Level */}
+                          {/* 1. Admin Privileges Management */}
+                          <div className="rounded-lg border border-border bg-card p-3 shadow-xs">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div>
+                                <Label className="text-xs font-semibold text-foreground block mb-0.5">
+                                  Role & Permissions
+                                </Label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {faculty.role === "admin"
+                                    ? "Has Admin access (task approvals, assignments, management)."
+                                    : "Standard Faculty Adviser access."}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleToggleAdminPrivilege(faculty.id, faculty.role)}
+                                className={`text-xs h-8 ${
+                                  faculty.role === "admin"
+                                    ? "text-amber-700 border-amber-300 hover:bg-amber-50"
+                                    : "text-indigo-700 border-indigo-300 hover:bg-indigo-50 font-semibold"
+                                }`}
+                              >
+                                {faculty.role === "admin" ? "Revoke Admin Privileges" : "Grant Admin Privileges"}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* 2. Reassign Year Level */}
                           <div className="rounded-lg border border-border bg-card p-3 shadow-xs">
                             <Label className="text-xs font-semibold text-foreground block mb-1.5">
                               Reassign Year Level
@@ -1273,7 +1349,7 @@ export function TaskBoard({
                                 }}
                                 className="text-xs h-7"
                               >
-                                {isAddingTask ? "✕ Close" : "➕ Add another task"}
+                                {isAddingTask ? "Close" : "+ Add Another Task"}
                               </Button>
                             </div>
 
@@ -1375,7 +1451,7 @@ export function TaskBoard({
                                             }`}
                                           >
                                             {tStatus === "completed"
-                                              ? "Completed ✓"
+                                              ? "Completed"
                                               : tStatus === "declined"
                                               ? "Declined"
                                               : tStatus === "accepted"
@@ -1383,7 +1459,7 @@ export function TaskBoard({
                                               : "Pending"}
                                           </span>
                                           <span className="text-[10px] text-muted-foreground">
-                                            {isTExpanded ? "▲" : "▼"}
+                                            {isTExpanded ? "Hide" : "Details"}
                                           </span>
                                         </div>
                                       </div>
@@ -1429,7 +1505,7 @@ export function TaskBoard({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
-                {activeAdviser?.name?.charAt(0) || "👤"}
+                {activeAdviser?.name?.charAt(0) || "F"}
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -1447,7 +1523,7 @@ export function TaskBoard({
             </div>
 
             <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-              ● Active Profile
+              Active Profile
             </span>
           </div>
 
@@ -1459,7 +1535,7 @@ export function TaskBoard({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-foreground">📥 New Assigned Tasks</span>
+                  <span className="text-base font-bold text-foreground">New Assigned Tasks</span>
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
                     {facultyNewAssignedTasks.length}
                   </span>
@@ -1470,7 +1546,7 @@ export function TaskBoard({
               {facultyNewAssignedTasks.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center text-xs text-muted-foreground">
-                    ✨ No new tasks awaiting action. All assigned tasks have been accepted or resolved!
+                    No new tasks awaiting action. All assigned tasks have been accepted or resolved.
                   </CardContent>
                 </Card>
               ) : (
@@ -1498,18 +1574,18 @@ export function TaskBoard({
                               {task.title}
                             </span>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>📅 {task.event_date}</span>
+                              <span>Date: {task.event_date}</span>
                               <span>•</span>
-                              <span>📍 {task.venue}</span>
+                              <span>Venue: {task.venue}</span>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                              Review ⏳
+                              Review Needed
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {isExpanded ? "▲" : "▼"}
+                              {isExpanded ? "Hide" : "Details"}
                             </span>
                           </div>
                         </div>
@@ -1536,7 +1612,7 @@ export function TaskBoard({
                                     }}
                                     className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
                                   >
-                                    ✕ Decline Task
+                                    Decline Task
                                   </Button>
                                   <Button
                                     size="sm"
@@ -1546,7 +1622,7 @@ export function TaskBoard({
                                     }}
                                     className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                                   >
-                                    ✓ Accept Task
+                                    Accept Task
                                   </Button>
                                 </div>
 
@@ -1560,7 +1636,7 @@ export function TaskBoard({
                                   }
                                   className="text-xs"
                                 >
-                                  💬 Notes ({taskComments.length})
+                                  Notes ({taskComments.length})
                                 </Button>
                               </div>
                             )}
@@ -1651,7 +1727,7 @@ export function TaskBoard({
                                   >
                                     {actionLoadingTaskId === task.id
                                       ? "Accepting..."
-                                      : "Confirm Acceptance ✓"}
+                                      : "Confirm Acceptance"}
                                   </Button>
                                 </div>
                               </div>
@@ -1683,7 +1759,7 @@ export function TaskBoard({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-foreground">📋 Accepted Tasks</span>
+                  <span className="text-base font-bold text-foreground">Accepted Tasks</span>
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800">
                     {facultyAcceptedTasks.length}
                   </span>
@@ -1725,16 +1801,16 @@ export function TaskBoard({
                                 {yearLevel}
                               </span>
                               <span>•</span>
-                              <span>📅 {task.event_date}</span>
+                              <span>Date: {task.event_date}</span>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                              Active ✓
+                              Active
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {isExpanded ? "▲" : "▼"}
+                              {isExpanded ? "Hide" : "Details"}
                             </span>
                           </div>
                         </div>
@@ -1769,7 +1845,7 @@ export function TaskBoard({
                               >
                                 {actionLoadingTaskId === task.id
                                   ? "Resolving..."
-                                  : "Resolve Task ✓ (Mark as Finished)"}
+                                  : "Mark as Resolved"}
                               </Button>
 
                               <Button
@@ -1782,7 +1858,7 @@ export function TaskBoard({
                                 }
                                 className="text-xs"
                               >
-                                💬 Remarks & Notes ({taskComments.length})
+                                Remarks & Notes ({taskComments.length})
                               </Button>
                             </div>
 
@@ -1821,7 +1897,7 @@ export function TaskBoard({
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <span>🏆 Finished Tasks</span>
+                <span>Finished Tasks</span>
                 <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.2">
                   {facultyFinishedTasks.length}
                 </span>
@@ -1836,7 +1912,7 @@ export function TaskBoard({
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <span>👥 Tasks from Other Faculties</span>
+                <span>Tasks from Other Faculty</span>
                 <span className="rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-2 py-0.2">
                   {otherFacultiesTasks.length}
                 </span>
@@ -1865,7 +1941,7 @@ export function TaskBoard({
                             className="flex cursor-pointer items-center justify-between p-3 hover:bg-muted/40 rounded-lg transition-colors"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="text-emerald-600 font-bold">✓</span>
+                              <span className="text-emerald-600 font-semibold text-xs">[Done]</span>
                               <span className="text-xs font-semibold text-foreground">
                                 {task.title}
                               </span>
@@ -1876,7 +1952,7 @@ export function TaskBoard({
                                 Completed
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {isExpanded ? "▲" : "▼"}
+                                {isExpanded ? "Hide" : "Details"}
                               </span>
                             </div>
                           </div>
@@ -1902,7 +1978,7 @@ export function TaskBoard({
                                   }
                                   className="text-xs h-7"
                                 >
-                                  💬 Notes & Remarks ({taskComments.length})
+                                  Notes & Remarks ({taskComments.length})
                                 </Button>
                                 {expandedCommentsTaskId === task.id && (
                                   <div className="mt-2">
@@ -1953,7 +2029,7 @@ export function TaskBoard({
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-xs font-bold text-primary">
-                                  👤 {assignedPeer?.name || "Colleague"}
+                                  {assignedPeer?.name || "Colleague"}
                                 </span>
                                 <span className="text-xs text-muted-foreground">•</span>
                                 <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground">
@@ -1978,7 +2054,7 @@ export function TaskBoard({
                                 }`}
                               >
                                 {status === "completed"
-                                  ? "Completed ✓"
+                                  ? "Completed"
                                   : status === "accepted"
                                   ? "Accepted"
                                   : status === "declined"
@@ -1986,7 +2062,7 @@ export function TaskBoard({
                                   : "Pending"}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {isExpanded ? "▲" : "▼"}
+                                {isExpanded ? "Hide" : "Details"}
                               </span>
                             </div>
                           </div>
@@ -2017,7 +2093,7 @@ export function TaskBoard({
                                   }
                                   className="text-xs h-7"
                                 >
-                                  💬 Coordinator Notes ({taskComments.length})
+                                  Coordinator Notes ({taskComments.length})
                                 </Button>
                                 {expandedCommentsTaskId === task.id && (
                                   <div className="mt-2">
