@@ -1,6 +1,6 @@
 -- 010-real-admin-setup.sql
 -- Complete migration for separating Demo vs Real System:
--- 1. Adds is_demo flag to both advisers and tasks
+-- 1. Adds all required columns to tasks and advisers (including status, is_demo, etc.)
 -- 2. Marks demo accounts (dean@gmail.com, oic@gmail.com, faculty@gmail.com) and their tasks
 -- 3. Pre-registers Real Admin accounts (Dean Admin & OIC Admin)
 -- 4. Adds RLS delete policies for tasks and advisers
@@ -8,9 +8,18 @@
 -- Run once in Supabase SQL Editor (Dashboard → SQL Editor → New query).
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- ── STEP 1: Add is_demo columns ──────────────────────────────────────────────
+-- ── STEP 1: Ensure all schema columns exist ──────────────────────────────────
+-- Advisers columns
+alter table advisers add column if not exists email text;
+alter table advisers add column if not exists role text not null default 'adviser';
 alter table advisers add column if not exists is_demo boolean not null default false;
-alter table tasks    add column if not exists is_demo boolean not null default false;
+
+-- Tasks columns
+alter table tasks add column if not exists status text not null default 'assigned';
+alter table tasks add column if not exists decline_reason text;
+alter table tasks add column if not exists year_level text;
+alter table tasks add column if not exists remarks text;
+alter table tasks add column if not exists is_demo boolean not null default false;
 
 -- ── STEP 2: Demo accounts setup & marking ─────────────────────────────────────
 -- Ensure demo adviser rows exist with is_demo = true
@@ -47,7 +56,7 @@ where adviser_id in (
 update tasks set is_demo = true
 where is_demo is null or adviser_id is null;
 
--- Ensure demo faculty has at least 2 active demo tasks to view
+-- Ensure demo faculty has active demo tasks to view
 do $$
 declare
   v_faculty_id uuid;
@@ -103,4 +112,4 @@ end $$;
 -- ── VERIFY ───────────────────────────────────────────────────────────────────
 -- Run this query after to confirm separation:
 -- select email, name, role, is_demo from advisers order by is_demo, role;
--- select title, is_demo from tasks;
+-- select title, status, is_demo from tasks;
