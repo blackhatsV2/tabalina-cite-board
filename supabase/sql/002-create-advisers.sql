@@ -1,5 +1,5 @@
 -- 002-create-advisers.sql
--- Create the advisers table for CITE Board with Row Level Security enabled.
+-- Create the advisers table for CITE Boardroom with Row Level Security enabled.
 
 create table if not exists advisers (
   id uuid primary key default gen_random_uuid(),

@@ -1,10 +1,10 @@
-# Spec: CITE Board
+# Spec: CITE Boardroom
 
 ## Problem
 Faculty advisers receive their CITE Week tasks scattered between a Google Sheet and a Messenger group chat. Having to cross-check both channels creates confusion regarding task details, schedules, and locations, buries approvals from the dean, and wastes roughly 2 hours per week per adviser.
 
 ## Solution
-CITE Board gives faculty advisers a single, unified mobile-friendly view where they can view their assigned CITE Week tasks, tap "Confirm" to acknowledge them, submit comments or resource requests directly on tasks, and see real-time approval statuses from both the OIC and Dean.
+CITE Boardroom gives faculty advisers a single, unified mobile-friendly view where they can view their assigned CITE Week tasks, tap "Confirm" to acknowledge them, submit comments or resource requests directly on tasks, and see real-time approval statuses from both the OIC and Dean.
 
 ## The user
 A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a year level during CITE Week.

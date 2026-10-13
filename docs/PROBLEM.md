@@ -1,4 +1,4 @@
-# CITE Board
+# CITE Boardroom
 
 ## Who
 A non-technical faculty adviser (e.g., Prof. Rivera) assigned to advise a specific year level during CITE Week at the College of Information Technology Education.
@@ -10,7 +10,7 @@ Faculty advisers receive their CITE Week tasks via a Google Sheet and a group ch
 The OIC (Officer-in-Charge) posts tasks in a Google Sheet and announces them in the faculty group chat. Faculty advisers toggle between the sheet and chat to see their assigned tasks, add comments, or request changes. The dean reviews the chat for approval signals. This process costs each adviser approximately 2 hours per week in extra coordination time, leads to missed updates (e.g., venue changes seen only hours before the event), and causes duplicate effort as multiple advisers ask the same clarifying questions in the chat.
 
 ## The MVP
-CITE Board lets a faculty adviser see their assigned tasks for CITE Week, confirm understanding, add comments, and view approval status from the OIC and dean in a single, simple interface.
+CITE Boardroom lets a faculty adviser see their assigned tasks for CITE Week, confirm understanding, add comments, and view approval status from the OIC and dean in a single, simple interface.
 
 ## How we'll know it worked
 Demo: A faculty adviser logs in, sees a list of their tasks (e.g., "Monitor Year 2 booth setup – Dec 16, 10 AM, Room 205"), taps "Confirm" on one task, adds a comment ("Need extra chairs"), and sees the OIC and dean approval status update in real time. Three non-technical faculty advisers will test it during the next CITE Week planning meeting.

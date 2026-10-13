@@ -1,5 +1,5 @@
 -- 003-create-tasks.sql
--- Create the tasks table for CITE Board with Row Level Security enabled.
+-- Create the tasks table for CITE Boardroom with Row Level Security enabled.
 
 create table if not exists tasks (
   id uuid primary key default gen_random_uuid(),

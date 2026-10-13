@@ -193,7 +193,7 @@ export function LandingPage() {
           <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">
             College of IT Education
           </p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">CITE Board</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">CITE Boardroom</h1>
           <p className="text-sm text-muted-foreground">Task Designation Management</p>
         </div>
 

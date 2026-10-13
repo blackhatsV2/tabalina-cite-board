@@ -41,7 +41,7 @@ export default async function Home() {
       {/* Brand Header */}
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          CITE Board
+          CITE Boardroom
         </h1>
         <p className="text-sm text-muted-foreground">
           Task Designation Management

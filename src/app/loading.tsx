@@ -7,7 +7,7 @@ export default function Loading() {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            CITE Board
+            CITE Boardroom
           </h1>
           <div className="flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-50/70 dark:bg-blue-950/40 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -31,7 +31,7 @@ export default function Loading() {
         </div>
 
         <h2 className="text-base font-bold text-foreground sm:text-lg">
-          Loading CITE Board
+          Loading CITE Boardroom
         </h2>
         <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-md">
           Fetching the latest duty designations, committee assignments, and faculty schedules. Please hold on…
