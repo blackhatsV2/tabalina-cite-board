@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 import { TaskComments, TaskComment } from "@/components/TaskComments";
 import { AuthBar, UserRole } from "@/components/AuthBar";
+import { GlobalChat } from "@/components/GlobalChat";
 import type { User } from "@supabase/supabase-js";
-import { Loader2 } from "lucide-react";
+import { Loader2, LayoutDashboard, MessageSquare } from "lucide-react";
 
 export type Adviser = {
   id: string;
@@ -269,6 +270,9 @@ export function TaskBoard({
 
   // Faculty bottom section active tab ("finished" vs "other-faculties")
   const [bottomTab, setBottomTab] = useState<"finished" | "other-faculties">("finished");
+
+  // Top-level View Tab: Tasks Board vs Global Chat
+  const [mainTab, setMainTab] = useState<"tasks" | "chat">("tasks");
 
   const isAdmin =
     userRole === "dean" ||
@@ -1092,10 +1096,47 @@ export function TaskBoard({
       {/* Supabase Auth Bar */}
       <AuthBar onUserChange={handleUserChange} />
 
-      {/* ============================================================== */}
-      {/* 1. DEAN AND OIC DASHBOARD (ADMIN VIEW)                         */}
-      {/* ============================================================== */}
-      {isAdmin ? (
+      {/* Main Navigation Tabs: Tasks Board vs Global Chat */}
+      <div className="flex items-center gap-2 border-b border-border pb-1">
+        <button
+          type="button"
+          onClick={() => setMainTab("tasks")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+            mainTab === "tasks"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span>Tasks Board</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("chat")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+            mainTab === "chat"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Global Chat</span>
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        </button>
+      </div>
+
+      {mainTab === "chat" ? (
+        <GlobalChat
+          currentUser={currentUser}
+          userRole={userRole}
+          authorName={effectiveAuthorName}
+          isCurrentUserDemo={isCurrentUserDemo}
+        />
+      ) : isAdmin ? (
         <div className="flex flex-col gap-6">
           {/* Top Bar with "Assign a Task" shortcut button */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5 shadow-xs">
