@@ -1,11 +1,7 @@
 # PHINMA AI Builder — team template
 
-<<<<<<< HEAD
 **Your live URL:** ✅ Already deployed (Ticket 01 complete)
 https://tabalina-phinma-builder.vercel.app
-=======
-**Your live URL:** https://tabalina-phinma-builder.vercel.app
->>>>>>> eee0881e03698660d1d2704d09d3ca3b6e354fdb
 
 This is your team's starting point. It is already a working Next.js app
 that deploys to Vercel. You will delete the starter page and build your
