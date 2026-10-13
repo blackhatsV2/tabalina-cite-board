@@ -17,6 +17,7 @@ export type Adviser = {
   year_level: string;
   email?: string | null;
   role?: string | null;
+  is_demo?: boolean | null;
   created_at: string;
 };
 
@@ -35,6 +36,7 @@ export type Task = {
   confirmed_at: string | null;
   oic_approval: string;
   dean_approval: string;
+  is_demo?: boolean | null;
   created_at: string;
 };
 
@@ -117,7 +119,13 @@ export function TaskBoard({
   // Faculty bottom section active tab ("finished" vs "other-faculties")
   const [bottomTab, setBottomTab] = useState<"finished" | "other-faculties">("finished");
 
+  // Demo data toggle — admins can reveal demo tasks; off by default
+  const [showDemo, setShowDemo] = useState(false);
+
   const isAdmin = userRole === "dean" || userRole === "oic" || userRole === "admin";
+
+  // Detect if the current user is a demo account
+  const isCurrentUserDemo = currentUser?.email?.toLowerCase() === "faculty@gmail.com";
 
   // Identify active faculty member for adviser view
   const activeAdviser =
@@ -664,12 +672,21 @@ export function TaskBoard({
   };
 
   // ==============================================================
+  // DEMO / REAL DATA SEPARATION
+  // ==============================================================
+  // For real admins: hide demo tasks unless showDemo is toggled on.
+  // For the demo faculty account: only show demo tasks.
+  const visibleTasks = tasks.filter((t) => {
+    if (isCurrentUserDemo) return t.is_demo === true;
+    if (isAdmin) return showDemo ? true : !t.is_demo;
+    // Regular adviser: show only their own non-demo tasks
+    return !t.is_demo;
+  });
+
+  // ==============================================================
   // DATA FILTERING FOR ADMIN DASHBOARD
   // ==============================================================
-  // Pending tasks for admin:
-  // - tasks not yet completed, AND
-  // - (faculty hasn't acted yet: 'assigned', OR faculty declined: 'declined', OR faculty accepted but not approved by admin/OIC)
-  const adminPendingTasks = tasks.filter((t) => {
+  const adminPendingTasks = visibleTasks.filter((t) => {
     const status = getTaskStatus(t);
     if (status === "completed") return false;
     if (status === "assigned" || status === "declined") return true;
@@ -682,24 +699,19 @@ export function TaskBoard({
   // ==============================================================
   // DATA FILTERING FOR FACULTY DASHBOARD
   // ==============================================================
-  // Faculty's own tasks
-  const myOwnTasks = tasks.filter((t) => t.adviser_id === activeAdviser?.id);
+  const myOwnTasks = visibleTasks.filter((t) => t.adviser_id === activeAdviser?.id);
 
-  // Left Section: New Assigned tasks (assigned and not accepted or declined yet)
   const facultyNewAssignedTasks = myOwnTasks.filter((t) => getTaskStatus(t) === "assigned");
 
-  // Right Section: Accepted tasks (accepted and admin approved, not yet finished)
   const facultyAcceptedTasks = myOwnTasks.filter((t) => {
     const status = getTaskStatus(t);
     const isAdminApproved = t.oic_approval === "approved" || t.dean_approval === "approved";
     return status === "accepted" && isAdminApproved;
   });
 
-  // Bottom Section: Finished tasks
   const facultyFinishedTasks = myOwnTasks.filter((t) => getTaskStatus(t) === "completed");
 
-  // Bottom Section: Tasks from other faculties
-  const otherFacultiesTasks = tasks.filter((t) => t.adviser_id !== activeAdviser?.id);
+  const otherFacultiesTasks = visibleTasks.filter((t) => t.adviser_id !== activeAdviser?.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -727,13 +739,26 @@ export function TaskBoard({
               </p>
             </div>
 
-            <Button
-              size="sm"
-              onClick={() => setShowAssignShortcut(!showAssignShortcut)}
-              className="text-xs font-semibold shadow-xs"
-            >
-              {showAssignShortcut ? "Close Form" : "+ Assign a Task"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDemo(!showDemo)}
+                className={`h-7 rounded px-2.5 text-[11px] font-medium border transition-colors ${
+                  showDemo
+                    ? "bg-amber-100 border-amber-300 text-amber-800"
+                    : "border-border/60 text-muted-foreground hover:text-foreground bg-background"
+                }`}
+              >
+                {showDemo ? "Hide Demo Data" : "Show Demo Data"}
+              </button>
+              <Button
+                size="sm"
+                onClick={() => setShowAssignShortcut(!showAssignShortcut)}
+                className="text-xs font-semibold shadow-xs"
+              >
+                {showAssignShortcut ? "Close Form" : "+ Assign a Task"}
+              </Button>
+            </div>
           </div>
 
           {/* Top Expandable "Assign a Task" Form */}

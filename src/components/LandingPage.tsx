@@ -266,12 +266,15 @@ export function LandingPage() {
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-[11px] text-muted-foreground">or try a demo account</span>
+          <span className="text-[11px] text-muted-foreground">or preview with a demo account</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
         {/* Demo accounts */}
         <div className="flex flex-col gap-2">
+          <p className="text-[11px] text-muted-foreground text-center">
+            Demo accounts use sandboxed data — separate from the real board.
+          </p>
           {demoAccounts.map(({ email: dEmail, label, sub }) => (
             <button
               key={dEmail}

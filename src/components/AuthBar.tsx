@@ -38,7 +38,13 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
 
   const resolveName = async (u: User | null): Promise<string> => {
     if (!u) return "";
-    // Try full_name from metadata first
+    const cleanEmail = u.email?.toLowerCase().trim() ?? "";
+
+    // Hardcoded real admin display names
+    if (cleanEmail === "dean@gmail.com") return "Dean Admin";
+    if (cleanEmail === "oic@gmail.com") return "OIC Admin";
+
+    // Try full_name from auth metadata
     const meta = u.user_metadata;
     if (meta?.full_name) return meta.full_name as string;
     if (meta?.first_name) {
@@ -51,11 +57,11 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
       const { data } = await supabase
         .from("advisers")
         .select("name")
-        .eq("email", u.email?.toLowerCase() ?? "")
+        .eq("email", cleanEmail)
         .maybeSingle();
       if (data?.name) return data.name as string;
     } catch { /* ignore */ }
-    // Fall back to email prefix
+    // Last resort: email prefix
     return u.email?.split("@")[0] ?? "User";
   };
 
