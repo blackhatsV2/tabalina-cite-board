@@ -57,44 +57,71 @@ export function TaskBoard({
   const [approvingTaskId, setApprovingTaskId] = useState<string | null>(null);
   const [expandedCommentsTaskId, setExpandedCommentsTaskId] = useState<string | null>(null);
 
-  // New task assignment modal/state for OIC
+  // Faculty tabs: "my-tasks" vs "other-tasks"
+  const [facultyTab, setFacultyTab] = useState<"my-tasks" | "other-tasks">("my-tasks");
+
+  // Admin state for OIC / Dean
   const [isAssigningTask, setIsAssigningTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskAdviserId, setNewTaskAdviserId] = useState<string>(
-    initialAdvisers[0]?.id || "",
+    initialAdvisers.find((a) => a.role !== "dean" && a.role !== "oic")?.id ||
+      initialAdvisers[0]?.id ||
+      ""
   );
   const [newTaskDate, setNewTaskDate] = useState("Dec 16, 9:00 AM");
   const [newTaskVenue, setNewTaskVenue] = useState("Room 205");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [assigningLoading, setAssigningLoading] = useState(false);
 
-  // Default to Year 2 / Maam Jo if present, otherwise first adviser
-  const [selectedAdviserId, setSelectedAdviserId] = useState<string>(
-    initialAdvisers[1]?.id || initialAdvisers[0]?.id || "all",
-  );
+  // Admin filter by adviser (defaults to 'all')
+  const [selectedAdviserId, setSelectedAdviserId] = useState<string>("all");
 
-  const selectedAdviser = advisers.find((a) => a.id === selectedAdviserId);
+  const isAdmin = userRole === "oic" || userRole === "dean";
 
-  const displayedTasks =
+  // Identify active faculty member for personal view
+  const activeAdviser =
+    (currentUser &&
+      advisers.find((a) => a.email?.toLowerCase() === currentUser.email?.toLowerCase())) ||
+    advisers.find((a) => a.role !== "dean" && a.role !== "oic") ||
+    advisers[0];
+
+  // Faculty specific task lists
+  const myTasks = tasks.filter((task) => task.adviser_id === activeAdviser?.id);
+  const otherTasks = tasks.filter((task) => task.adviser_id !== activeAdviser?.id);
+
+  // Admin specific task list
+  const adminDisplayedTasks =
     selectedAdviserId === "all"
       ? tasks
       : tasks.filter((task) => task.adviser_id === selectedAdviserId);
 
-  const handleUserChange = (user: User | null, role: UserRole) => {
+  const displayedTasks = isAdmin
+    ? adminDisplayedTasks
+    : facultyTab === "my-tasks"
+    ? myTasks
+    : otherTasks;
+
+  const handleUserChange = async (user: User | null, role: UserRole) => {
     setCurrentUser(user);
     setUserRole(role);
 
-    // If an adviser logs in, match their profile automatically
-    if (user && role === "adviser") {
-      const matched = advisers.find(
-        (a) => a.email?.toLowerCase() === user.email?.toLowerCase(),
-      );
-      if (matched) {
-        setSelectedAdviserId(matched.id);
+    try {
+      const supabase = createClient();
+      const { data: latestAdvisers } = await supabase
+        .from("advisers")
+        .select("*")
+        .order("year_level", { ascending: true });
+      if (latestAdvisers && latestAdvisers.length > 0) {
+        setAdvisers(latestAdvisers);
       }
-    } else if (role === "dean" || role === "oic") {
-      // Admins see all tasks by default
+    } catch {
+      // Continue with current advisers
+    }
+
+    if (role === "dean" || role === "oic") {
       setSelectedAdviserId("all");
+    } else {
+      setFacultyTab("my-tasks");
     }
   };
 
@@ -121,8 +148,8 @@ export function TaskBoard({
         prevTasks.map((t) =>
           t.id === taskId
             ? { ...t, is_confirmed: true, confirmed_at: confirmedTime }
-            : t,
-        ),
+            : t
+        )
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unexpected error";
@@ -152,7 +179,7 @@ export function TaskBoard({
       }
 
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, ...updatePayload } : t)),
+        prev.map((t) => (t.id === taskId ? { ...t, ...updatePayload } : t))
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unexpected error";
@@ -170,6 +197,7 @@ export function TaskBoard({
     const supabase = createClient();
 
     try {
+      const isDean = userRole === "dean";
       const { data, error } = await supabase
         .from("tasks")
         .insert({
@@ -178,8 +206,8 @@ export function TaskBoard({
           event_date: newTaskDate.trim(),
           venue: newTaskVenue.trim(),
           description: newTaskDesc.trim(),
-          oic_approval: "approved", // Pre-approved by the OIC who assigned it
-          dean_approval: "pending",
+          oic_approval: isDean ? "approved" : "approved",
+          dean_approval: isDean ? "approved" : "pending",
         })
         .select()
         .single();
@@ -234,30 +262,43 @@ export function TaskBoard({
       ? "College Dean"
       : currentUser?.email === "oic@gmail.com"
       ? "OIC Coordinator"
-      : currentUser?.email?.split("@")[0] ||
-        selectedAdviser?.name ||
-        "Faculty Adviser";
+      : currentUser?.user_metadata?.full_name ||
+        activeAdviser?.name ||
+        currentUser?.email?.split("@")[0] ||
+        "Faculty Member";
+
+  const assignableAdvisers = advisers.filter(
+    (a) => a.role !== "dean" && a.role !== "oic"
+  );
 
   return (
     <div className="flex flex-col gap-5">
       {/* Supabase Auth Bar */}
       <AuthBar onUserChange={handleUserChange} />
 
-      {/* Admin Quick Action (OIC / Dean) */}
-      {(userRole === "oic" || userRole === "dean") && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-xs">
-          <div>
-            <h3 className="text-sm font-semibold text-primary">
-              Admin Controls ({userRole.toUpperCase()})
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {userRole === "oic"
-                ? "As OIC, you can create and assign tasks to faculty advisers or grant OIC approval."
-                : "As College Dean, you can review and grant Dean approvals on pending tasks."}
-            </p>
-          </div>
+      {/* ============================================================== */}
+      {/* ADMIN VIEW: OIC & DEAN CONTROLS                                 */}
+      {/* ============================================================== */}
+      {isAdmin ? (
+        <div className="flex flex-col gap-4">
+          {/* Admin Header Action */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 shadow-xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground uppercase tracking-wider">
+                  Admin Panel
+                </span>
+                <h3 className="text-sm font-semibold text-primary">
+                  {userRole === "dean" ? "College Dean" : "OIC Coordinator"}
+                </h3>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {userRole === "dean"
+                  ? "Manage tasks across all faculty members, create assignments, and review approvals."
+                  : "Assign CITE Week tasks to faculty advisers, coordinate venues, and grant approvals."}
+              </p>
+            </div>
 
-          {userRole === "oic" && (
             <Button
               size="sm"
               onClick={() => setIsAssigningTask(!isAssigningTask)}
@@ -265,174 +306,275 @@ export function TaskBoard({
             >
               {isAssigningTask ? "Close Form" : "➕ Assign New Task"}
             </Button>
+          </div>
+
+          {/* Task Assignment Form (OIC & Dean) */}
+          {isAssigningTask && (
+            <Card className="border-primary/40 shadow-md">
+              <CardHeader className="pb-3 pt-4">
+                <CardTitle className="text-base font-semibold">
+                  Assign Task to Faculty Adviser
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-4">
+                <form onSubmit={handleAssignTask} className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="task-title" className="text-xs">
+                      Task Title
+                    </Label>
+                    <Input
+                      id="task-title"
+                      placeholder="e.g. Lead Registration Desk & ID Badges"
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      required
+                      className="text-xs h-9"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="assign-adviser" className="text-xs">
+                        Assign To Faculty
+                      </Label>
+                      <select
+                        id="assign-adviser"
+                        value={newTaskAdviserId}
+                        onChange={(e) => setNewTaskAdviserId(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {assignableAdvisers.map((adv) => (
+                          <option key={adv.id} value={adv.id}>
+                            {adv.name} ({adv.year_level})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="task-date" className="text-xs">
+                        Date & Time
+                      </Label>
+                      <Input
+                        id="task-date"
+                        placeholder="Dec 16, 9:00 AM"
+                        value={newTaskDate}
+                        onChange={(e) => setNewTaskDate(e.target.value)}
+                        required
+                        className="text-xs h-9"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="task-venue" className="text-xs">
+                        Venue
+                      </Label>
+                      <Input
+                        id="task-venue"
+                        placeholder="Room 205"
+                        value={newTaskVenue}
+                        onChange={(e) => setNewTaskVenue(e.target.value)}
+                        required
+                        className="text-xs h-9"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="task-desc" className="text-xs">
+                      Instructions / Description
+                    </Label>
+                    <Input
+                      id="task-desc"
+                      placeholder="Specific setup details or coordination instructions..."
+                      value={newTaskDesc}
+                      onChange={(e) => setNewTaskDesc(e.target.value)}
+                      className="text-xs h-9"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAssigningTask(false)}
+                      className="text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={assigningLoading}
+                      className="text-xs"
+                    >
+                      {assigningLoading ? "Assigning..." : "Assign Task"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
           )}
-        </div>
-      )}
 
-      {/* OIC Task Assignment Form */}
-      {isAssigningTask && userRole === "oic" && (
-        <Card className="border-primary/40 shadow-md">
-          <CardHeader className="pb-3 pt-4">
-            <CardTitle className="text-base font-semibold">
-              Assign New CITE Week Task
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4">
-            <form onSubmit={handleAssignTask} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="task-title" className="text-xs">
-                  Task Title
-                </Label>
-                <Input
-                  id="task-title"
-                  placeholder="e.g. Lead Registration Desk & ID Badges"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  required
-                  className="text-xs h-9"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="assign-adviser" className="text-xs">
-                    Assign To Adviser
-                  </Label>
-                  <select
-                    id="assign-adviser"
-                    value={newTaskAdviserId}
-                    onChange={(e) => setNewTaskAdviserId(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {advisers.map((adv) => (
-                      <option key={adv.id} value={adv.id}>
-                        {adv.name} ({adv.year_level})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="task-date" className="text-xs">
-                    Date & Time
-                  </Label>
-                  <Input
-                    id="task-date"
-                    placeholder="Dec 16, 9:00 AM"
-                    value={newTaskDate}
-                    onChange={(e) => setNewTaskDate(e.target.value)}
-                    required
-                    className="text-xs h-9"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="task-venue" className="text-xs">
-                    Venue
-                  </Label>
-                  <Input
-                    id="task-venue"
-                    placeholder="Room 205"
-                    value={newTaskVenue}
-                    onChange={(e) => setNewTaskVenue(e.target.value)}
-                    required
-                    className="text-xs h-9"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="task-desc" className="text-xs">
-                  Instructions / Description
-                </Label>
-                <Input
-                  id="task-desc"
-                  placeholder="Specific setup details or coordination instructions..."
-                  value={newTaskDesc}
-                  onChange={(e) => setNewTaskDesc(e.target.value)}
-                  className="text-xs h-9"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAssigningTask(false)}
-                  className="text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={assigningLoading}
-                  className="text-xs"
-                >
-                  {assigningLoading ? "Assigning..." : "Assign Task"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Adviser Filter Switcher */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="mb-2.5 flex items-center justify-between">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Filter Tasks By Faculty Adviser
-          </label>
-          <span className="text-xs text-muted-foreground">
-            {selectedAdviser ? `${selectedAdviser.name} (${selectedAdviser.year_level})` : "All Advisers"}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {advisers.map((adviser) => {
-            const isSelected = selectedAdviserId === adviser.id;
-            return (
+          {/* Admin Faculty Directory Filter: See All Faculties */}
+          <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="mb-2.5 flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Faculty Directory — Filter Tasks
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {selectedAdviserId === "all"
+                  ? "Showing all faculties"
+                  : `Filtered: ${advisers.find((a) => a.id === selectedAdviserId)?.name}`}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <button
-                key={adviser.id}
-                onClick={() => setSelectedAdviserId(adviser.id)}
+                onClick={() => setSelectedAdviserId("all")}
                 type="button"
-                className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  isSelected
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  selectedAdviserId === "all"
+                    ? "border-primary bg-primary text-primary-foreground shadow-xs"
                     : "border-border bg-background text-foreground hover:bg-muted"
                 }`}
               >
-                <span>{adviser.name}</span>
+                <span>All Faculties</span>
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    isSelected ? "bg-primary-foreground/20 text-white" : "bg-muted text-muted-foreground"
+                    selectedAdviserId === "all"
+                      ? "bg-primary-foreground/25 text-white"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {adviser.year_level}
+                  {tasks.length}
                 </span>
               </button>
-            );
-          })}
-          <button
-            onClick={() => setSelectedAdviserId("all")}
-            type="button"
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              selectedAdviserId === "all"
-                ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                : "border-border bg-background text-foreground hover:bg-muted"
-            }`}
-          >
-            Show All
-          </button>
-        </div>
-      </div>
 
-      {/* Tasks List */}
+              {assignableAdvisers.map((adv) => {
+                const isSelected = selectedAdviserId === adv.id;
+                const advCount = tasks.filter((t) => t.adviser_id === adv.id).length;
+                return (
+                  <button
+                    key={adv.id}
+                    onClick={() => setSelectedAdviserId(adv.id)}
+                    type="button"
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                        : "border-border bg-background text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <span>{adv.name}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                        isSelected
+                          ? "bg-primary-foreground/25 text-white"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {advCount}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ============================================================== */
+        /* FACULTY VIEW: ONLY SEES OWN NAME & TWO TABS                   */
+        /* ============================================================== */
+        <div className="flex flex-col gap-4">
+          {/* Faculty Profile Card — Only shows their own name */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+                {activeAdviser?.name?.charAt(0) || "👤"}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {activeAdviser?.name || "Faculty Adviser"}
+                  </h3>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    {activeAdviser?.year_level || "Year Level"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  CITE Faculty Member • CITE Week 2026 Committee
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                ● Active Profile
+              </span>
+            </div>
+          </div>
+
+          {/* Faculty Navigation Tabs */}
+          <div className="flex border-b border-border">
+            <button
+              type="button"
+              onClick={() => setFacultyTab("my-tasks")}
+              className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-all ${
+                facultyTab === "my-tasks"
+                  ? "border-primary text-primary bg-primary/5 rounded-t-lg"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              }`}
+            >
+              <span>📋 My Tasks</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] ${
+                  facultyTab === "my-tasks"
+                    ? "bg-primary text-primary-foreground font-bold"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {myTasks.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFacultyTab("other-tasks")}
+              className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition-all ${
+                facultyTab === "other-tasks"
+                  ? "border-primary text-primary bg-primary/5 rounded-t-lg"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              }`}
+            >
+              <span>👥 Other Faculties&apos; Tasks</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] ${
+                  facultyTab === "other-tasks"
+                    ? "bg-primary text-primary-foreground font-bold"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {otherTasks.length}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* TASK LIST SECTION                                              */}
+      {/* ============================================================== */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            {selectedAdviser ? `${selectedAdviser.name}'s Tasks` : "All Assigned Tasks"}{" "}
-            <span className="text-sm font-normal text-muted-foreground">
+          <h2 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+            {isAdmin
+              ? selectedAdviserId === "all"
+                ? "All Department Tasks"
+                : `${advisers.find((a) => a.id === selectedAdviserId)?.name}'s Tasks`
+              : facultyTab === "my-tasks"
+              ? "My Assigned Tasks"
+              : "Tasks from Other Faculties"}{" "}
+            <span className="text-xs font-normal text-muted-foreground sm:text-sm">
               ({displayedTasks.length})
             </span>
           </h2>
@@ -441,9 +583,15 @@ export function TaskBoard({
         {displayedTasks.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-              <p className="text-sm font-medium text-foreground">No tasks assigned yet</p>
+              <p className="text-sm font-medium text-foreground">
+                {facultyTab === "my-tasks" && !isAdmin
+                  ? "You have no tasks assigned yet"
+                  : "No tasks found in this view"}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Log in as OIC or run seed queries to assign tasks.
+                {isAdmin
+                  ? "Click '➕ Assign New Task' above to assign tasks to faculty members."
+                  : "The OIC or Dean will assign and finalize your tasks here."}
               </p>
             </CardContent>
           </Card>
@@ -453,9 +601,14 @@ export function TaskBoard({
               const taskComments = comments.filter((c) => c.task_id === task.id);
               const isExpanded = expandedCommentsTaskId === task.id;
               const assignedTo = advisers.find((a) => a.id === task.adviser_id);
+              const isAssignedToMe = task.adviser_id === activeAdviser?.id;
+              const canConfirmThisTask = isAssignedToMe || isAdmin;
 
               return (
-                <Card key={task.id} className="overflow-hidden border-border transition-all shadow-sm">
+                <Card
+                  key={task.id}
+                  className="overflow-hidden border-border transition-all shadow-xs"
+                >
                   <CardHeader className="bg-muted/30 pb-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
@@ -463,9 +616,9 @@ export function TaskBoard({
                           <CardTitle className="text-base font-semibold text-foreground">
                             {task.title}
                           </CardTitle>
-                          {assignedTo && (
-                            <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                              👤 {assignedTo.name}
+                          {assignedTo && (isAdmin || facultyTab === "other-tasks") && (
+                            <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              👤 {assignedTo.name} ({assignedTo.year_level})
                             </span>
                           )}
                         </div>
@@ -525,7 +678,9 @@ export function TaskBoard({
                             disabled={approvingTaskId === `${task.id}-oic`}
                             className="h-6 text-[10px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 px-2"
                           >
-                            {approvingTaskId === `${task.id}-oic` ? "Approving..." : "Approve as OIC ✓"}
+                            {approvingTaskId === `${task.id}-oic`
+                              ? "Approving..."
+                              : "Approve as OIC ✓"}
                           </Button>
                         )}
 
@@ -537,7 +692,9 @@ export function TaskBoard({
                             disabled={approvingTaskId === `${task.id}-dean`}
                             className="h-6 text-[10px] border-purple-300 text-purple-700 hover:bg-purple-50 px-2"
                           >
-                            {approvingTaskId === `${task.id}-dean` ? "Approving..." : "Approve as Dean ✓"}
+                            {approvingTaskId === `${task.id}-dean`
+                              ? "Approving..."
+                              : "Approve as Dean ✓"}
                           </Button>
                         )}
                       </div>
@@ -554,22 +711,32 @@ export function TaskBoard({
                           💬 Notes ({taskComments.length}) {isExpanded ? "▲" : "▼"}
                         </Button>
 
-                        <Button
-                          size="sm"
-                          variant={task.is_confirmed ? "outline" : "default"}
-                          disabled={task.is_confirmed || confirmingTaskId === task.id}
-                          onClick={() => handleConfirm(task.id)}
-                        >
-                          {confirmingTaskId === task.id
-                            ? "Confirming..."
-                            : task.is_confirmed
-                            ? "Confirmed ✓"
-                            : "Confirm Understanding"}
-                        </Button>
+                        {/* Confirmation button: enabled for owner or admin; descriptive text if belonging to peer */}
+                        {canConfirmThisTask ? (
+                          <Button
+                            size="sm"
+                            variant={task.is_confirmed ? "outline" : "default"}
+                            disabled={task.is_confirmed || confirmingTaskId === task.id}
+                            onClick={() => handleConfirm(task.id)}
+                            className="text-xs"
+                          >
+                            {confirmingTaskId === task.id
+                              ? "Confirming..."
+                              : task.is_confirmed
+                              ? "Confirmed ✓"
+                              : "Confirm Understanding"}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic px-2">
+                            {task.is_confirmed
+                              ? `Confirmed by ${assignedTo?.name || "Faculty"}`
+                              : `Assigned to ${assignedTo?.name || "Faculty"}`}
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Modular Comments Component */}
+                    {/* Modular Comments Drawer */}
                     {isExpanded && (
                       <TaskComments
                         taskId={task.id}

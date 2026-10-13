@@ -55,7 +55,7 @@ export default async function Home() {
 
       <footer className="mt-auto border-t border-border pt-4 text-xs text-muted-foreground flex justify-between">
         <span>PHINMA AI Builder MVP — Team Tabalina</span>
-        <span>Ticket 06 — Auth & Modularity</span>
+        <span>Ticket 07 — Faculty Tabs & Admin Views</span>
       </footer>
     </main>
   );

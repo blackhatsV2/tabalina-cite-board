@@ -10,14 +10,15 @@ CITE Board gives faculty advisers a single, unified mobile-friendly view where t
 A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a year level during CITE Week.
 
 ## User stories
-1. As a faculty adviser, I want to select or view my assigned tasks with date, time, and venue, so that I immediately know my schedule and responsibilities in one place.
-2. As a faculty adviser, I want to tap "Confirm" on any assigned task, so that the OIC knows I have reviewed and accepted the assignment.
-3. As a faculty adviser, I want to view the OIC and Dean approval status badges on each task, so that I know whether the task is pending or finalized.
-4. As a faculty adviser, I want to post a comment on a specific task (e.g., "Need extra chairs"), so that my questions or resource needs are visible in context.
-5. As a faculty adviser, I want to see previous comments and updates on a task, so that I don't repeat questions already clarified.
+1. As a faculty adviser, I want to see my own name and assigned tasks with date, time, and venue, so that I immediately know my schedule and responsibilities.
+2. As a faculty adviser, I want a tab for "My Tasks" and a tab for "Other Faculties' Tasks", so that I can focus on my work while keeping visibility on team coordination.
+3. As a faculty adviser, I want to tap "Confirm" on my assigned tasks, so that the OIC knows I have reviewed and accepted the assignment.
+4. As a faculty adviser, I want to view OIC and Dean approval statuses and post comments/resource requests directly on tasks.
+5. As an admin (OIC or Dean), I want to see all faculty members, view their assigned tasks, and create/assign new tasks to them.
 
 ## Screens
-- **Screen 1: Task Board (`/`)**: A clean mobile-first board showing the adviser's assigned tasks (with venue, time, and OIC/Dean approval badges), a "Confirm" action button, and an expandable comment thread to read and submit task notes.
+- **Screen 1: Faculty Board (`/`)**: A clean mobile-first view showing the adviser's own profile, tabs for "My Tasks" and "Other Faculties' Tasks", confirmation actions, and comment threads.
+- **Screen 2: Admin Controls (OIC & Dean)**: Full faculty directory filter, approval toggles, and an assignment form allowing OIC and Dean to create tasks for any faculty adviser.
 
 ## Data
 ### 1. `advisers`
@@ -25,8 +26,10 @@ A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a ye
   - `id` (uuid, primary key)
   - `name` (text, e.g., "Prof. Rivera")
   - `year_level` (text, e.g., "Year 2")
+  - `email` (text, optional)
+  - `role` (text, default 'adviser', or 'oic'/'dean')
   - `created_at` (timestamptz)
-- Security: Anyone may read.
+- Security: Anyone may read and insert.
 
 ### 2. `tasks`
 - Columns:
@@ -41,7 +44,7 @@ A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a ye
   - `oic_approval` (text, default 'pending')
   - `dean_approval` (text, default 'pending')
   - `created_at` (timestamptz)
-- Security: Anyone may read. Anyone may update `is_confirmed` and `confirmed_at`.
+- Security: Anyone may read. Anyone may update and insert.
 
 ### 3. `comments`
 - Columns:
@@ -53,18 +56,18 @@ A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a ye
 - Security: Anyone may read. Anyone may insert.
 
 ## Login
-No accounts required for the MVP. Advisers switch or select their profile via a simple dropdown selector on the board (e.g., "Prof. Rivera") so the demo can run without password roadblocks.
+Supabase Auth with 1-click demo logins for Faculty Adviser, OIC Coordinator, and College Dean. Faculty members see their own name; OIC and Dean access admin features.
 
 ## Done for the demo
-- [ ] App loads on the live URL (`https://tabalina-cite-board.vercel.app`) on mobile and desktop.
-- [ ] Faculty adviser views their pre-populated CITE Week tasks with event time and venue.
-- [ ] Tapping "Confirm" immediately updates the task status to Confirmed.
-- [ ] Adding a comment ("Need extra chairs") displays it immediately under the task.
-- [ ] Task displays visible OIC and Dean approval statuses.
+- [x] App loads on the live URL (`https://tabalina-cite-board.vercel.app`) on mobile and desktop.
+- [x] Faculty adviser views their pre-populated CITE Week tasks with event time and venue.
+- [x] Tapping "Confirm" immediately updates the task status to Confirmed.
+- [x] Adding a comment displays it immediately under the task.
+- [x] Task displays visible OIC and Dean approval statuses.
+- [ ] Faculty members only see their own name, with tabs for "My Tasks" and "Other Faculties' Tasks".
+- [ ] Admins (OIC and Dean) can see all faculties and create new tasks for them.
 
 ## Out of scope
-- Announcement broadcast tab
-- Separate full management dashboards for OIC and Dean
-- Faculty task creation or task editing
+- Announcement broadcast SMS/push notifications
 - File uploads and media attachments
-- Push notifications, SMS, or external calendar sync
+- External calendar synchronization

@@ -4,10 +4,10 @@
 
 **Blocked by:** 05
 
-**Status:** todo
+**Status:** done
 
-- [ ] Auth login and sign up form component built using the pinned UI components
-- [ ] Users can sign in or sign up with email and password using Supabase Auth
-- [ ] Active session is detected and displays the logged-in user with a Sign Out button
-- [ ] Logging out securely clears the session and returns to the login prompt
-- [ ] Works on the live URL
+- [x] Auth login and sign up form component built using the pinned UI components
+- [x] Users can sign in or sign up with email and password using Supabase Auth
+- [x] Active session is detected and displays the logged-in user with a Sign Out button
+- [x] Logging out securely clears the session and returns to the login prompt
+- [x] Works on the live URL
