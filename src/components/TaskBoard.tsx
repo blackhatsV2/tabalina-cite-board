@@ -119,13 +119,12 @@ export function TaskBoard({
   // Faculty bottom section active tab ("finished" vs "other-faculties")
   const [bottomTab, setBottomTab] = useState<"finished" | "other-faculties">("finished");
 
-  // Demo data toggle — admins can reveal demo tasks; off by default
-  const [showDemo, setShowDemo] = useState(false);
-
   const isAdmin = userRole === "dean" || userRole === "oic" || userRole === "admin";
 
-  // Detect if the current user is a demo account
-  const isCurrentUserDemo = currentUser?.email?.toLowerCase() === "faculty@gmail.com";
+  // All three demo emails are sandboxed — they see ONLY demo tasks.
+  // Real accounts (any other email) see ONLY non-demo tasks.
+  const DEMO_EMAILS = new Set(["dean@gmail.com", "oic@gmail.com", "faculty@gmail.com"]);
+  const isCurrentUserDemo = DEMO_EMAILS.has(currentUser?.email?.toLowerCase() ?? "");
 
   // Identify active faculty member for adviser view
   const activeAdviser =
@@ -324,6 +323,33 @@ export function TaskBoard({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error deleting task";
       alert("Error: " + msg);
+    }
+  };
+
+  // ==============================================================
+  // ADMIN ACTIONS: Delete Adviser Account
+  // ==============================================================
+  const handleDeleteAdviser = async (adviserId: string, adviserName: string) => {
+    if (
+      !window.confirm(
+        `Remove "${adviserName}" from the system?\n\nThis will unassign all their tasks (tasks will remain but unassigned). This cannot be undone.`
+      )
+    )
+      return;
+
+    const supabase = createClient();
+    try {
+      // Unassign tasks first so foreign key constraint doesn't block deletion
+      await supabase.from("tasks").update({ adviser_id: null }).eq("adviser_id", adviserId);
+      const { error } = await supabase.from("advisers").delete().eq("id", adviserId);
+      if (error) {
+        alert("Failed to remove account: " + error.message);
+        return;
+      }
+      setAdvisers((prev) => prev.filter((a) => a.id !== adviserId));
+      setExpandedFacultyId(null);
+    } catch (err: unknown) {
+      alert("Error: " + (err instanceof Error ? err.message : "Unexpected error"));
     }
   };
 
@@ -674,13 +700,12 @@ export function TaskBoard({
   // ==============================================================
   // DEMO / REAL DATA SEPARATION
   // ==============================================================
-  // For real admins: hide demo tasks unless showDemo is toggled on.
-  // For the demo faculty account: only show demo tasks.
+  // Demo accounts (all 3 preset emails) → see only demo tasks.
+  // Real accounts (any other email) → see only real (non-demo) tasks.
+  // is_demo may be null/undefined before migration runs → treat as false.
   const visibleTasks = tasks.filter((t) => {
-    if (isCurrentUserDemo) return t.is_demo === true;
-    if (isAdmin) return showDemo ? true : !t.is_demo;
-    // Regular adviser: show only their own non-demo tasks
-    return !t.is_demo;
+    const isDemo = t.is_demo === true;
+    return isCurrentUserDemo ? isDemo : !isDemo;
   });
 
   // ==============================================================
@@ -739,26 +764,13 @@ export function TaskBoard({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowDemo(!showDemo)}
-                className={`h-7 rounded px-2.5 text-[11px] font-medium border transition-colors ${
-                  showDemo
-                    ? "bg-amber-100 border-amber-300 text-amber-800"
-                    : "border-border/60 text-muted-foreground hover:text-foreground bg-background"
-                }`}
-              >
-                {showDemo ? "Hide Demo Data" : "Show Demo Data"}
-              </button>
-              <Button
-                size="sm"
-                onClick={() => setShowAssignShortcut(!showAssignShortcut)}
-                className="text-xs font-semibold shadow-xs"
-              >
-                {showAssignShortcut ? "Close Form" : "+ Assign a Task"}
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowAssignShortcut(!showAssignShortcut)}
+              className="text-xs font-semibold shadow-xs"
+            >
+              {showAssignShortcut ? "Close Form" : "+ Assign a Task"}
+            </Button>
           </div>
 
           {/* Top Expandable "Assign a Task" Form */}
@@ -1312,18 +1324,28 @@ export function TaskBoard({
                                     : "Standard Faculty Adviser access."}
                                 </p>
                               </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleToggleAdminPrivilege(faculty.id, faculty.role)}
-                                className={`text-xs h-8 ${
-                                  faculty.role === "admin"
-                                    ? "text-amber-700 border-amber-300 hover:bg-amber-50"
-                                    : "text-indigo-700 border-indigo-300 hover:bg-indigo-50 font-semibold"
-                                }`}
-                              >
-                                {faculty.role === "admin" ? "Revoke Admin Privileges" : "Grant Admin Privileges"}
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleToggleAdminPrivilege(faculty.id, faculty.role)}
+                                  className={`text-xs h-8 ${
+                                    faculty.role === "admin"
+                                      ? "text-amber-700 border-amber-300 hover:bg-amber-50"
+                                      : "text-indigo-700 border-indigo-300 hover:bg-indigo-50 font-semibold"
+                                  }`}
+                                >
+                                  {faculty.role === "admin" ? "Revoke Admin" : "Grant Admin"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteAdviser(faculty.id, faculty.name)}
+                                  className="text-xs h-8 text-rose-600 hover:bg-rose-50 border-rose-200"
+                                >
+                                  Remove Account
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
@@ -1542,14 +1564,10 @@ export function TaskBoard({
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  CITE Week 2026 Faculty Dashboard • Coordinate and complete assigned responsibilities
+                  Faculty Adviser — Task Designation Management
                 </p>
               </div>
             </div>
-
-            <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-              Active Profile
-            </span>
           </div>
 
           {/* TWO SECTION SPLIT: Left Section (New Assigned Tasks) & Right Section (Accepted Tasks) */}
