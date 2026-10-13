@@ -17,8 +17,14 @@ A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a ye
 5. As an admin (OIC or Dean), I want to see all faculty members, view their assigned tasks, and create/assign new tasks to them.
 
 ## Screens
-- **Screen 1: Faculty Board (`/`)**: A clean mobile-first view showing the adviser's own profile, tabs for "My Tasks" and "Other Faculties' Tasks", confirmation actions, and comment threads.
-- **Screen 2: Admin Controls (OIC & Dean)**: Full faculty directory filter, approval toggles, and an assignment form allowing OIC and Dean to create tasks for any faculty adviser.
+- **Screen 1: Faculty Dashboard (`/`)**: 
+  - Left Section: **New Assigned Tasks** list (expandable). Actions: "Decline task" (requires decline reason), "Accept task" (optional comment/notes).
+  - Right Section: **Accepted Tasks** list (title, year level, date, expandable). Shows tasks accepted & admin-approved but not yet finished. Action: "Resolve" button (moves task to Finished Tasks section) and remarks.
+  - Bottom Section: **Finished Tasks** and **Tasks from Other Faculties** lists (expandable).
+- **Screen 2: Dean and OIC Dashboard (Admins)**:
+  - Top Action: "Assign a Task" button/form shortcut (dropdown for faculty names, dropdown for year levels, task title, description, location, time, date).
+  - Left Section: **Pending Tasks** list (titles only: Faculty name, year level, task title). Click to expand shows status (declined with reason, or pending), Delete action, and Edit action (to update task details and pass back to faculty). Also allow admin approval.
+  - Right Section: **Faculties List** (shows Name, assigned year level, task count, 0 if none). Click to expand faculty to: reassign year level, view expandable list of tasks assigned to that faculty with status, and "Add another task" button.
 
 ## Data
 ### 1. `advisers`
@@ -29,7 +35,7 @@ A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a ye
   - `email` (text, optional)
   - `role` (text, default 'adviser', or 'oic'/'dean')
   - `created_at` (timestamptz)
-- Security: Anyone may read and insert.
+- Security: Anyone may read, insert, and update.
 
 ### 2. `tasks`
 - Columns:
@@ -39,12 +45,15 @@ A non-technical faculty adviser (e.g., Prof. Rivera) assigned to coordinate a ye
   - `description` (text)
   - `event_date` (text)
   - `venue` (text)
+  - `year_level` (text, nullable)
+  - `status` (text, default 'assigned' — 'assigned', 'accepted', 'declined', 'completed')
+  - `decline_reason` (text, nullable)
   - `is_confirmed` (boolean, default false)
   - `confirmed_at` (timestamptz, nullable)
   - `oic_approval` (text, default 'pending')
   - `dean_approval` (text, default 'pending')
   - `created_at` (timestamptz)
-- Security: Anyone may read. Anyone may update and insert.
+- Security: Anyone may read, insert, update, and delete.
 
 ### 3. `comments`
 - Columns:
@@ -64,8 +73,10 @@ Supabase Auth with 1-click demo logins for Faculty Adviser, OIC Coordinator, and
 - [x] Tapping "Confirm" immediately updates the task status to Confirmed.
 - [x] Adding a comment displays it immediately under the task.
 - [x] Task displays visible OIC and Dean approval statuses.
-- [ ] Faculty members only see their own name, with tabs for "My Tasks" and "Other Faculties' Tasks".
-- [ ] Admins (OIC and Dean) can see all faculties and create new tasks for them.
+- [x] Faculty members only see their own name, with tabs for "My Tasks" and "Other Faculties' Tasks".
+- [x] Admins (OIC and Dean) can see all faculties and create new tasks for them.
+- [ ] Dean & OIC Dashboard: Left section with pending tasks (expandable: decline status + reason, pending status, edit & reassign, delete); Right section with faculty list (expandable: reassign year level, task list with statuses, add task); Top shortcut "Assign a Task".
+- [ ] Faculty Dashboard: Left section "New Assigned Tasks" (expandable: decline with required reason, accept with optional comments); Right section "Accepted Tasks" (expandable: resolve button, remarks); Bottom section "Finished Tasks" and "Tasks from Other Faculties".
 
 ## Out of scope
 - Announcement broadcast SMS/push notifications

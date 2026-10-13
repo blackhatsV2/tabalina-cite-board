@@ -29,7 +29,7 @@ export default async function Home() {
   const comments: TaskComment[] = commentsData || [];
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 sm:py-12">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:py-10">
       {/* Brand Header */}
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -55,7 +55,7 @@ export default async function Home() {
 
       <footer className="mt-auto border-t border-border pt-4 text-xs text-muted-foreground flex justify-between">
         <span>PHINMA AI Builder MVP — Team Tabalina</span>
-        <span>Ticket 07 — Faculty Tabs & Admin Views</span>
+        <span>Ticket 08 — Admin & Faculty Dashboards</span>
       </footer>
     </main>
   );
