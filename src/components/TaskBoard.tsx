@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 export type Adviser = {
   id: string;
@@ -31,7 +32,10 @@ interface TaskBoardProps {
 }
 
 export function TaskBoard({ initialAdvisers, initialTasks }: TaskBoardProps) {
-  // Default to the first adviser (e.g. Year 2 / Maam Jo if available, or first in list)
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [confirmingTaskId, setConfirmingTaskId] = useState<string | null>(null);
+
+  // Default to Year 2 / Maam Jo if present, otherwise first adviser
   const [selectedAdviserId, setSelectedAdviserId] = useState<string>(
     initialAdvisers[1]?.id || initialAdvisers[0]?.id || "all",
   );
@@ -40,8 +44,43 @@ export function TaskBoard({ initialAdvisers, initialTasks }: TaskBoardProps) {
 
   const displayedTasks =
     selectedAdviserId === "all"
-      ? initialTasks
-      : initialTasks.filter((task) => task.adviser_id === selectedAdviserId);
+      ? tasks
+      : tasks.filter((task) => task.adviser_id === selectedAdviserId);
+
+  const handleConfirm = async (taskId: string) => {
+    setConfirmingTaskId(taskId);
+    const confirmedTime = new Date().toISOString();
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("tasks")
+        .update({
+          is_confirmed: true,
+          confirmed_at: confirmedTime,
+        })
+        .eq("id", taskId);
+
+      if (error) {
+        alert("Error confirming task: " + error.message);
+        return;
+      }
+
+      // Optimistically update local state so the UI reacts immediately
+      setTasks((prevTasks) =>
+        prevTasks.map((t) =>
+          t.id === taskId
+            ? { ...t, is_confirmed: true, confirmed_at: confirmedTime }
+            : t,
+        ),
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unexpected error";
+      alert("Error: " + message);
+    } finally {
+      setConfirmingTaskId(null);
+    }
+  };
 
   const getStatusBadge = (status: string, label: string) => {
     const isApproved = status.toLowerCase() === "approved";
@@ -57,6 +96,16 @@ export function TaskBoard({ initialAdvisers, initialTasks }: TaskBoardProps) {
         {isApproved ? "Approved ✓" : "Pending ⏳"}
       </span>
     );
+  };
+
+  const formatConfirmedTime = (timestamp: string | null) => {
+    if (!timestamp) return "";
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } catch {
+      return "";
+    }
   };
 
   return (
@@ -152,11 +201,18 @@ export function TaskBoard({ initialAdvisers, initialTasks }: TaskBoardProps) {
                     </div>
 
                     {/* Confirmation Status Badge */}
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                       {task.is_confirmed ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                          Confirmed ✓
-                        </span>
+                        <div className="flex flex-col items-end">
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                            Confirmed ✓
+                          </span>
+                          {task.confirmed_at && (
+                            <span className="text-[10px] text-muted-foreground mt-0.5">
+                              at {formatConfirmedTime(task.confirmed_at)}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
                           Awaiting Confirmation
@@ -184,9 +240,14 @@ export function TaskBoard({ initialAdvisers, initialTasks }: TaskBoardProps) {
                       <Button
                         size="sm"
                         variant={task.is_confirmed ? "outline" : "default"}
-                        disabled={task.is_confirmed}
+                        disabled={task.is_confirmed || confirmingTaskId === task.id}
+                        onClick={() => handleConfirm(task.id)}
                       >
-                        {task.is_confirmed ? "Confirmed" : "Confirm Understanding"}
+                        {confirmingTaskId === task.id
+                          ? "Confirming..."
+                          : task.is_confirmed
+                          ? "Confirmed ✓"
+                          : "Confirm Understanding"}
                       </Button>
                     </div>
                   </div>
