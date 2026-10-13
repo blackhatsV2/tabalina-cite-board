@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { TaskComments, TaskComment } from "@/components/TaskComments";
+import { AuthBar } from "@/components/AuthBar";
+import type { User } from "@supabase/supabase-js";
 
 export type Adviser = {
   id: string;
@@ -27,13 +29,7 @@ export type Task = {
   created_at: string;
 };
 
-export type TaskComment = {
-  id: string;
-  task_id: string;
-  author_name: string;
-  content: string;
-  created_at: string;
-};
+export type { TaskComment };
 
 interface TaskBoardProps {
   initialAdvisers: Adviser[];
@@ -46,12 +42,11 @@ export function TaskBoard({
   initialTasks,
   initialComments,
 }: TaskBoardProps) {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [comments, setComments] = useState<TaskComment[]>(initialComments);
   const [confirmingTaskId, setConfirmingTaskId] = useState<string | null>(null);
   const [expandedCommentsTaskId, setExpandedCommentsTaskId] = useState<string | null>(null);
-  const [newCommentText, setNewCommentText] = useState<{ [taskId: string]: string }>({});
-  const [submittingCommentTaskId, setSubmittingCommentTaskId] = useState<string | null>(null);
 
   // Default to Year 2 / Maam Jo if present, otherwise first adviser
   const [selectedAdviserId, setSelectedAdviserId] = useState<string>(
@@ -99,42 +94,6 @@ export function TaskBoard({
     }
   };
 
-  const handleAddComment = async (taskId: string) => {
-    const text = newCommentText[taskId]?.trim();
-    if (!text) return;
-
-    setSubmittingCommentTaskId(taskId);
-    const authorName = selectedAdviser?.name || "Faculty Adviser";
-
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("comments")
-        .insert({
-          task_id: taskId,
-          author_name: authorName,
-          content: text,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        alert("Error posting comment: " + error.message);
-        return;
-      }
-
-      if (data) {
-        setComments((prev) => [...prev, data]);
-        setNewCommentText((prev) => ({ ...prev, [taskId]: "" }));
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unexpected error";
-      alert("Error: " + message);
-    } finally {
-      setSubmittingCommentTaskId(null);
-    }
-  };
-
   const getStatusBadge = (status: string, label: string) => {
     const isApproved = status.toLowerCase() === "approved";
     return (
@@ -161,13 +120,21 @@ export function TaskBoard({
     }
   };
 
+  const effectiveAuthorName =
+    currentUser?.email?.split("@")[0] ||
+    selectedAdviser?.name ||
+    "Faculty Adviser";
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
+      {/* Supabase Auth Bar */}
+      <AuthBar onUserChange={(user) => setCurrentUser(user)} />
+
       {/* Adviser Profile Switcher */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="mb-2.5 flex items-center justify-between">
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            View Tasks As Faculty Adviser
+            Filter Tasks By Faculty Adviser
           </label>
           <span className="text-xs text-muted-foreground">
             {selectedAdviser ? `${selectedAdviser.name} (${selectedAdviser.year_level})` : "All Advisers"}
@@ -320,77 +287,16 @@ export function TaskBoard({
                       </div>
                     </div>
 
-                    {/* Expandable Comments / Notes Section */}
+                    {/* Modular Comments Component */}
                     {isExpanded && (
-                      <div className="rounded-lg border border-border/80 bg-muted/20 p-3.5 flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Clarifications & Comments ({taskComments.length})
-                          </h4>
-                          <span className="text-[11px] text-muted-foreground">
-                            Posting as <strong className="text-foreground">{selectedAdviser?.name || "Adviser"}</strong>
-                          </span>
-                        </div>
-
-                        {/* Comments List */}
-                        {taskComments.length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">
-                            No notes yet. Add questions, chair requests, or setup notes below.
-                          </p>
-                        ) : (
-                          <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
-                            {taskComments.map((comment) => (
-                              <div
-                                key={comment.id}
-                                className="rounded-md border border-border bg-card p-2.5 text-xs shadow-xs"
-                              >
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-semibold text-foreground">
-                                    {comment.author_name}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {formatTime(comment.created_at)}
-                                  </span>
-                                </div>
-                                <p className="text-foreground/90 whitespace-pre-wrap">
-                                  {comment.content}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Add Comment Input */}
-                        <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                          <Input
-                            placeholder="e.g. Need 4 extra chairs and an extension cord..."
-                            value={newCommentText[task.id] || ""}
-                            onChange={(e) =>
-                              setNewCommentText((prev) => ({
-                                ...prev,
-                                [task.id]: e.target.value,
-                              }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleAddComment(task.id);
-                              }
-                            }}
-                            className="text-xs h-9"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddComment(task.id)}
-                            disabled={
-                              submittingCommentTaskId === task.id ||
-                              !newCommentText[task.id]?.trim()
-                            }
-                          >
-                            {submittingCommentTaskId === task.id ? "Posting..." : "Send"}
-                          </Button>
-                        </div>
-                      </div>
+                      <TaskComments
+                        taskId={task.id}
+                        comments={taskComments}
+                        authorName={effectiveAuthorName}
+                        onCommentAdded={(newComment) =>
+                          setComments((prev) => [...prev, newComment])
+                        }
+                      />
                     )}
                   </CardContent>
                 </Card>
