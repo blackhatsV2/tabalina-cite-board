@@ -4,10 +4,10 @@
 
 **Blocked by:** 04
 
-**Status:** todo
+**Status:** done
 
-- [ ] Comments table created with Row Level Security enabled for read and insert
-- [ ] Adviser can view existing comments associated with a selected task
-- [ ] Adviser can type and submit a comment (e.g., "Need extra chairs")
-- [ ] Newly added comment appears immediately on the task without manual reload
-- [ ] Works on the live URL
+- [x] Comments table created with Row Level Security enabled for read and insert
+- [x] Adviser can view existing comments associated with a selected task
+- [x] Adviser can type and submit a comment (e.g., "Need extra chairs")
+- [x] Newly added comment appears immediately on the task without manual reload
+- [x] Works on the live URL

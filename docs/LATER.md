@@ -13,3 +13,5 @@ stays small enough to actually ship by Session 3.
 - **Task creation/edit by faculty** — only the OIC assigns tasks. Faculty confirm, comment, or suggest changes.
 - **File attachments or multimedia** — keep it text-only for the MVP.
 - **Calendar sync or notifications** — in-app status is enough for the MVP. No email or SMS yet.
+- **User accounts & login (Supabase Auth)** — Email/password login for faculty advisers, OIC, and Dean. Planned right after the core commenting MVP loop is complete.
+

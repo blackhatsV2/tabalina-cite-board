@@ -4,10 +4,10 @@
 
 **Blocked by:** 03
 
-**Status:** todo
+**Status:** done
 
-- [ ] Row Level Security policy permits updating task confirmation fields
-- [ ] Tapping "Confirm" updates the task's confirmed status and timestamp in Supabase
-- [ ] Confirmed tasks visibly display a "Confirmed" badge with confirmation time
-- [ ] Task confirmation state persists across page refresh
-- [ ] Works on the live URL
+- [x] Row Level Security policy permits updating task confirmation fields
+- [x] Tapping "Confirm" updates the task's confirmed status and timestamp in Supabase
+- [x] Confirmed tasks visibly display a "Confirmed" badge with confirmation time
+- [x] Task confirmation state persists across page refresh
+- [x] Works on the live URL

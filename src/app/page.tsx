@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { TaskBoard, Adviser, Task } from "@/components/TaskBoard";
+import { TaskBoard, Adviser, Task, TaskComment } from "@/components/TaskBoard";
 
 export const revalidate = 0;
 
@@ -18,8 +18,15 @@ export default async function Home() {
     .select("*")
     .order("created_at", { ascending: true });
 
+  // Fetch comments (fail gracefully if table not yet created)
+  const { data: commentsData } = await supabase
+    .from("comments")
+    .select("*")
+    .order("created_at", { ascending: true });
+
   const advisers: Adviser[] = advisersData || [];
   const tasks: Task[] = tasksData || [];
+  const comments: TaskComment[] = commentsData || [];
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 sm:py-12">
@@ -35,16 +42,20 @@ export default async function Home() {
           CITE Board
         </h1>
         <p className="text-sm text-muted-foreground">
-          Assigned tasks, event schedules, and live approvals for faculty advisers in one place.
+          Assigned tasks, event schedules, live approvals, and coordinator notes in one place.
         </p>
       </header>
 
       {/* Interactive Board */}
-      <TaskBoard initialAdvisers={advisers} initialTasks={tasks} />
+      <TaskBoard
+        initialAdvisers={advisers}
+        initialTasks={tasks}
+        initialComments={comments}
+      />
 
       <footer className="mt-auto border-t border-border pt-4 text-xs text-muted-foreground flex justify-between">
         <span>PHINMA AI Builder MVP — Team Tabalina</span>
-        <span>Ticket 03</span>
+        <span>Ticket 05</span>
       </footer>
     </main>
   );
