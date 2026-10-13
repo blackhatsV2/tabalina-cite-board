@@ -67,3 +67,22 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* Date & Time Picker Enhancements */
+input[type="date"],
+input[type="time"] {
+  color-scheme: light dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease-in-out;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+

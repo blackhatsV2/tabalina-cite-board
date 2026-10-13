@@ -61,6 +61,88 @@ export const formatYearLevel = (val?: string | null): string => {
   return clean;
 };
 
+export function parseDateToISO(dateStr: string): string {
+  if (!dateStr) return "2026-12-16";
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parsed = Date.parse(trimmed);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return "2026-12-16";
+}
+
+export function parseTimeTo24(timeStr: string): string {
+  if (!timeStr) return "09:00";
+  const trimmed = timeStr.trim();
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (match) {
+    let hour = parseInt(match[1], 10);
+    const minute = match[2];
+    const ampm = match[3]?.toUpperCase();
+    if (ampm === "PM" && hour < 12) hour += 12;
+    if (ampm === "AM" && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, "0")}:${minute}`;
+  }
+  return "09:00";
+}
+
+export function parseEventDate(eventDate: string): { isoDate: string; time24: string } {
+  if (!eventDate) return { isoDate: "2026-12-16", time24: "09:00" };
+  const timeMatch = eventDate.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
+  let timeStr = "09:00";
+  let datePart = eventDate;
+  if (timeMatch) {
+    timeStr = timeMatch[1].trim();
+    datePart = eventDate
+      .replace(timeMatch[0], "")
+      .replace(/,\s*$/, "")
+      .replace(/^\s*,/, "")
+      .trim();
+  }
+  return {
+    isoDate: parseDateToISO(datePart),
+    time24: parseTimeTo24(timeStr),
+  };
+}
+
+export function formatDisplayDate(dateStr: string): string {
+  if (!dateStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return dateStr;
+}
+
+export function formatDisplayTime(timeStr: string): string {
+  if (!timeStr) return "";
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(timeStr)) {
+    const [h, m] = timeStr.split(":").map(Number);
+    const period = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+  }
+  return timeStr;
+}
+
+export function combineDateTime(isoDate: string, time24: string): string {
+  const d = formatDisplayDate(isoDate);
+  const t = formatDisplayTime(time24);
+  if (d && t) return `${d}, ${t}`;
+  return d || t || "";
+}
+
 interface TaskBoardProps {
   initialAdvisers: Adviser[];
   initialTasks: Task[];
@@ -100,8 +182,8 @@ export function TaskBoard({
   const [shortcutTitle, setShortcutTitle] = useState("");
   const [shortcutDesc, setShortcutDesc] = useState("");
   const [shortcutLocation, setShortcutLocation] = useState("");
-  const [shortcutTime, setShortcutTime] = useState("9:00 AM");
-  const [shortcutDate, setShortcutDate] = useState("Dec 16, 2026");
+  const [shortcutTime, setShortcutTime] = useState("09:00");
+  const [shortcutDate, setShortcutDate] = useState("2026-12-16");
   const [shortcutLoading, setShortcutLoading] = useState(false);
 
   // Editing state for Admin pending task
@@ -111,8 +193,8 @@ export function TaskBoard({
   const [editFacultyId, setEditFacultyId] = useState("");
   const [editYearLevel, setEditYearLevel] = useState("1st Year");
   const [editLocation, setEditLocation] = useState("");
-  const [editTime, setEditTime] = useState("");
-  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("09:00");
+  const [editDate, setEditDate] = useState("2026-12-16");
   const [editLoading, setEditLoading] = useState(false);
 
   // Reassign year level state for Admin Faculty list
@@ -124,8 +206,8 @@ export function TaskBoard({
   const [addUnderDesc, setAddUnderDesc] = useState("");
   const [addUnderYearLevel, setAddUnderYearLevel] = useState("1st Year");
   const [addUnderLocation, setAddUnderLocation] = useState("");
-  const [addUnderTime, setAddUnderTime] = useState("9:00 AM");
-  const [addUnderDate, setAddUnderDate] = useState("Dec 16, 2026");
+  const [addUnderTime, setAddUnderTime] = useState("09:00");
+  const [addUnderDate, setAddUnderDate] = useState("2026-12-16");
   const [addUnderLoading, setAddUnderLoading] = useState(false);
 
   // Faculty response state (Decline & Accept forms)
@@ -218,7 +300,7 @@ export function TaskBoard({
     if (!shortcutTitle.trim() || !shortcutFacultyId) return;
 
     setShortcutLoading(true);
-    const eventDateCombined = `${shortcutDate.trim()}${shortcutTime.trim() ? `, ${shortcutTime.trim()}` : ""}`;
+    const eventDateCombined = combineDateTime(shortcutDate, shortcutTime);
     const assignedYearLevel = shortcutYearLevel || "General";
 
     const supabase = createClient();
@@ -296,16 +378,16 @@ export function TaskBoard({
     setEditYearLevel(formatYearLevel(task.year_level));
     setEditLocation(task.venue);
     // Parse event date
-    const parts = task.event_date.split(",");
-    setEditDate(parts[0]?.trim() || "Dec 16, 2026");
-    setEditTime(parts[1]?.trim() || "9:00 AM");
+    const { isoDate, time24 } = parseEventDate(task.event_date);
+    setEditDate(isoDate);
+    setEditTime(time24);
   };
 
   const handleSaveEditTask = async (taskId: string) => {
     if (!editTitle.trim()) return;
     setEditLoading(true);
 
-    const eventDateCombined = `${editDate.trim()}${editTime.trim() ? `, ${editTime.trim()}` : ""}`;
+    const eventDateCombined = combineDateTime(editDate, editTime);
     const updatePayload = {
       title: editTitle.trim(),
       description: editDesc.trim(),
@@ -514,7 +596,7 @@ export function TaskBoard({
     if (!addUnderTitle.trim()) return;
     setAddUnderLoading(true);
 
-    const eventDateCombined = `${addUnderDate.trim()}${addUnderTime.trim() ? `, ${addUnderTime.trim()}` : ""}`;
+    const eventDateCombined = combineDateTime(addUnderDate, addUnderTime);
     const assignedYearLevel = addUnderYearLevel || "General";
 
     const supabase = createClient();
@@ -845,6 +927,33 @@ export function TaskBoard({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Time Options Datalist for easy selection */}
+      <datalist id="task-time-options">
+        <option value="07:00">7:00 AM</option>
+        <option value="07:30">7:30 AM</option>
+        <option value="08:00">8:00 AM</option>
+        <option value="08:30">8:30 AM</option>
+        <option value="09:00">9:00 AM</option>
+        <option value="09:30">9:30 AM</option>
+        <option value="10:00">10:00 AM</option>
+        <option value="10:30">10:30 AM</option>
+        <option value="11:00">11:00 AM</option>
+        <option value="11:30">11:30 AM</option>
+        <option value="12:00">12:00 PM</option>
+        <option value="12:30">12:30 PM</option>
+        <option value="13:00">1:00 PM</option>
+        <option value="13:30">1:30 PM</option>
+        <option value="14:00">2:00 PM</option>
+        <option value="14:30">2:30 PM</option>
+        <option value="15:00">3:00 PM</option>
+        <option value="15:30">3:30 PM</option>
+        <option value="16:00">4:00 PM</option>
+        <option value="16:30">4:30 PM</option>
+        <option value="17:00">5:00 PM</option>
+        <option value="17:30">5:30 PM</option>
+        <option value="18:00">6:00 PM</option>
+      </datalist>
+
       {/* Supabase Auth Bar */}
       <AuthBar onUserChange={handleUserChange} />
 
@@ -962,11 +1071,12 @@ export function TaskBoard({
                       </Label>
                       <Input
                         id="sc-date"
-                        placeholder="Dec 16, 2026"
+                        type="date"
                         value={shortcutDate}
                         onChange={(e) => setShortcutDate(e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker?.()}
                         required
-                        className="text-xs h-9"
+                        className="text-xs h-9 cursor-pointer"
                       />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -975,11 +1085,13 @@ export function TaskBoard({
                       </Label>
                       <Input
                         id="sc-time"
-                        placeholder="9:00 AM"
+                        type="time"
+                        list="task-time-options"
                         value={shortcutTime}
                         onChange={(e) => setShortcutTime(e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker?.()}
                         required
-                        className="text-xs h-9"
+                        className="text-xs h-9 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -1260,17 +1372,22 @@ export function TaskBoard({
                                   <div className="flex flex-col gap-1">
                                     <Label className="text-[11px]">Date</Label>
                                     <Input
+                                      type="date"
                                       value={editDate}
                                       onChange={(e) => setEditDate(e.target.value)}
-                                      className="text-xs h-8"
+                                      onClick={(e) => e.currentTarget.showPicker?.()}
+                                      className="text-xs h-8 cursor-pointer"
                                     />
                                   </div>
                                   <div className="flex flex-col gap-1">
                                     <Label className="text-[11px]">Time</Label>
                                     <Input
+                                      type="time"
+                                      list="task-time-options"
                                       value={editTime}
                                       onChange={(e) => setEditTime(e.target.value)}
-                                      className="text-xs h-8"
+                                      onClick={(e) => e.currentTarget.showPicker?.()}
+                                      className="text-xs h-8 cursor-pointer"
                                     />
                                   </div>
                                 </div>
@@ -1519,16 +1636,21 @@ export function TaskBoard({
                                     className="text-xs h-8"
                                   />
                                   <Input
-                                    placeholder="Date"
+                                    type="date"
+                                    aria-label="Date"
                                     value={addUnderDate}
                                     onChange={(e) => setAddUnderDate(e.target.value)}
-                                    className="text-xs h-8"
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                    className="text-xs h-8 cursor-pointer"
                                   />
                                   <Input
-                                    placeholder="Time"
+                                    type="time"
+                                    list="task-time-options"
+                                    aria-label="Time"
                                     value={addUnderTime}
                                     onChange={(e) => setAddUnderTime(e.target.value)}
-                                    className="text-xs h-8"
+                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                    className="text-xs h-8 cursor-pointer"
                                   />
                                   <select
                                     value={addUnderYearLevel}

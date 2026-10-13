@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { Eye, EyeOff } from "lucide-react";
+
 type AuthMode = "idle" | "signin" | "signup";
 
 export function LandingPage() {
   const [mode, setMode] = useState<AuthMode>("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,6 +25,7 @@ export function LandingPage() {
     setMessage(null);
     setEmail("");
     setPassword("");
+    setShowPassword(false);
     setFirstName("");
     setLastName("");
   };
@@ -274,15 +278,30 @@ export function LandingPage() {
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="lp-password" className="text-xs text-muted-foreground">Password</Label>
-              <Input
-                id="lp-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-9 text-sm"
-              />
+              <div className="relative">
+                <Input
+                  id="lp-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-9 text-sm pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded p-0.5 transition-colors cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {message && (
