@@ -42,6 +42,9 @@ export default function Home() {
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           Your app is live.
         </h1>
+        <p className="text-sm font-medium text-primary">
+          Team Tabalina — deploy test ✅
+        </p>
         <p className="text-base text-muted-foreground">
           This page is deployed on the internet right now. Anyone with the link
           can open it. That is the whole point — you will be building on
