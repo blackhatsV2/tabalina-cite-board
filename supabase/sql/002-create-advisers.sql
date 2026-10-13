@@ -20,7 +20,7 @@ create policy "anyone can read advisers"
 -- Seed initial faculty advisers
 insert into advisers (name, year_level)
 values
-  ('Prof. Rivera', 'Year 2'),
-  ('Prof. Santos', 'Year 1'),
-  ('Prof. Cruz', 'Year 3'),
-  ('Prof. Dalisay', 'Year 4');
+  ('Sir Arms', 'Year 1'),
+  ('Maam Jo', 'Year 2'),
+  ('Sir Aram', 'Year 3'),
+  ('Doc Fuentes', 'Year 4');

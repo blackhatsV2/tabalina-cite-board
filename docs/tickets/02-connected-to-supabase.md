@@ -4,10 +4,10 @@
 
 **Blocked by:** 01
 
-**Status:** todo
+**Status:** done
 
-- [ ] Environment variables configured locally and on Vercel
-- [ ] Advisers table created with Row Level Security enabled and read policies in place
-- [ ] Seed data for advisers (e.g., Prof. Rivera) exists in the database
-- [ ] App displays the list of advisers fetched from the database
-- [ ] Works on the live URL
+- [x] Environment variables configured locally and on Vercel
+- [x] Advisers table created with Row Level Security enabled and read policies in place
+- [x] Seed data for advisers (e.g., Prof. Rivera) exists in the database
+- [x] App displays the list of advisers fetched from the database
+- [x] Works on the live URL
