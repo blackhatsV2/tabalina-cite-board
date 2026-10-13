@@ -8,35 +8,54 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { User } from "@supabase/supabase-js";
 
+export type UserRole = "dean" | "oic" | "adviser";
+
 interface AuthBarProps {
-  onUserChange?: (user: User | null) => void;
+  onUserChange?: (user: User | null, role: UserRole) => void;
 }
 
 export function AuthBar({ onUserChange }: AuthBarProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<UserRole>("adviser");
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+
+  // Form fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [yearLevel, setYearLevel] = useState("Year 2");
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const determineRole = (userEmail?: string | null): UserRole => {
+    if (!userEmail) return "adviser";
+    const cleanEmail = userEmail.toLowerCase().trim();
+    if (cleanEmail === "dean@gmail.com") return "dean";
+    if (cleanEmail === "oic@gmail.com") return "oic";
+    return "adviser";
+  };
 
   useEffect(() => {
     const supabase = createClient();
 
-    // Check active session on mount
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
-      onUserChange?.(user);
+      const userRole = determineRole(user?.email);
+      setRole(userRole);
+      onUserChange?.(user, userRole);
     });
 
-    // Subscribe to auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      onUserChange?.(currentUser);
+      const userRole = determineRole(currentUser?.email);
+      setRole(userRole);
+      onUserChange?.(currentUser, userRole);
     });
 
     return () => {
@@ -63,32 +82,106 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
           setMessage({ type: "error", text: error.message });
         } else {
           setMessage({ type: "success", text: "Signed in successfully!" });
-          setTimeout(() => setIsOpen(false), 800);
+          setTimeout(() => setIsOpen(false), 600);
         }
       } else {
+        // Sign up with first and last name
+        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim() || email.split("@")[0];
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+              full_name: fullName,
+              year_level: yearLevel,
+            },
+          },
         });
 
         if (error) {
           setMessage({ type: "error", text: error.message });
-        } else if (data.user && !data.session) {
-          setMessage({
-            type: "success",
-            text: "Account created! Please check your email to verify or sign in.",
-          });
         } else {
-          setMessage({ type: "success", text: "Account created & signed in!" });
-          setTimeout(() => setIsOpen(false), 800);
+          // Record or sync into advisers table
+          try {
+            await supabase.from("advisers").insert({
+              name: fullName,
+              year_level: yearLevel,
+              email: email.toLowerCase().trim(),
+              role: determineRole(email),
+            });
+          } catch {
+            // If already exists or error, continue
+          }
+
+          if (data.user && !data.session) {
+            setMessage({
+              type: "success",
+              text: "Account created! You can now log in with your credentials.",
+            });
+          } else {
+            setMessage({ type: "success", text: "Account created and logged in!" });
+            setTimeout(() => setIsOpen(false), 600);
+          }
         }
       }
     } catch (err: unknown) {
-      const text = err instanceof Error ? err.message : "Authentication failed";
+      const text = err instanceof Error ? err.message : "Authentication error";
       setMessage({ type: "error", text });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuickLogin = async (demoEmail: string) => {
+    setLoading(true);
+    setMessage(null);
+    setEmail(demoEmail);
+    setPassword("password123");
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: demoEmail,
+      password: "password123",
+    });
+
+    if (error) {
+      // If user not yet created in Supabase Auth, attempt automatic sign up for instant demo experience
+      const demoRole = determineRole(demoEmail);
+      const demoName =
+        demoEmail === "dean@gmail.com"
+          ? "Dean"
+          : demoEmail === "oic@gmail.com"
+          ? "OIC Coordinator"
+          : "Jayrold Tabalina";
+
+      const signUpRes = await supabase.auth.signUp({
+        email: demoEmail,
+        password: "password123",
+        options: {
+          data: { full_name: demoName },
+        },
+      });
+
+      if (signUpRes.error) {
+        setMessage({
+          type: "error",
+          text: `Demo sign-in failed: ${signUpRes.error.message}. Please create the user in Supabase Auth or click Sign Up.`,
+        });
+      } else {
+        setMessage({
+          type: "success",
+          text: `Demo account initialized for ${demoEmail}!`,
+        });
+        setTimeout(() => setIsOpen(false), 800);
+      }
+    } else {
+      setMessage({ type: "success", text: `Signed in as ${demoEmail}!` });
+      setTimeout(() => setIsOpen(false), 600);
+    }
+    setLoading(false);
   };
 
   const handleSignOut = async () => {
@@ -97,19 +190,33 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
     setUser(null);
   };
 
+  const getRoleBadge = (r: UserRole) => {
+    switch (r) {
+      case "dean":
+        return <span className="rounded bg-purple-100 text-purple-800 px-1.5 py-0.5 font-bold uppercase text-[10px]">Dean (Admin)</span>;
+      case "oic":
+        return <span className="rounded bg-blue-100 text-blue-800 px-1.5 py-0.5 font-bold uppercase text-[10px]">OIC (Admin)</span>;
+      default:
+        return <span className="rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 font-semibold text-[10px]">Faculty Adviser</span>;
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3">
       {/* Top Session Status Bar */}
-      <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/40 px-3.5 py-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/40 px-3.5 py-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           {user ? (
-            <span className="text-foreground">
-              Signed in as: <strong className="font-semibold">{user.email}</strong>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-foreground">
+                Logged in: <strong className="font-semibold">{user.email}</strong>
+              </span>
+              {getRoleBadge(role)}
+            </div>
           ) : (
             <span className="text-muted-foreground">
-              Viewing as Guest / Demo Mode
+              Guest Mode — Sign in to assign, approve, or confirm tasks
             </span>
           )}
         </div>
@@ -140,7 +247,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
           <CardHeader className="pb-3 pt-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold">
-                {mode === "signin" ? "Faculty Adviser Sign In" : "Create Adviser Account"}
+                {mode === "signin" ? "Account Sign In" : "Register Faculty Adviser"}
               </CardTitle>
               <div className="flex gap-1 text-xs">
                 <button
@@ -175,8 +282,99 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
             </div>
           </CardHeader>
 
-          <CardContent className="pb-4">
+          <CardContent className="pb-4 flex flex-col gap-4">
+            {/* Quick Demo Logins Section */}
+            <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
+                  ⚡ 1-Click Demo Accounts (password: password123)
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => handleQuickLogin("dean@gmail.com")}
+                  className="h-7 text-[11px] bg-background"
+                >
+                  👔 Dean
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => handleQuickLogin("oic@gmail.com")}
+                  className="h-7 text-[11px] bg-background"
+                >
+                  📋 OIC (Assign Tasks)
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => handleQuickLogin("jtabalina.ui@phinmaed.com")}
+                  className="h-7 text-[11px] bg-background"
+                >
+                  🧑‍🏫 Adviser (J. Tabalina)
+                </Button>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+              {mode === "signup" && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="first-name" className="text-xs">
+                        First Name
+                      </Label>
+                      <Input
+                        id="first-name"
+                        placeholder="e.g. Maria"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                        className="text-xs h-9"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="last-name" className="text-xs">
+                        Last Name
+                      </Label>
+                      <Input
+                        id="last-name"
+                        placeholder="e.g. Santos"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                        className="text-xs h-9"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="year-level" className="text-xs">
+                      Assigned Year Level
+                    </Label>
+                    <select
+                      id="year-level"
+                      value={yearLevel}
+                      onChange={(e) => setYearLevel(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="Year 1">Year 1</option>
+                      <option value="Year 2">Year 2</option>
+                      <option value="Year 3">Year 3</option>
+                      <option value="Year 4">Year 4</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
               <div className="flex flex-col gap-1">
                 <Label htmlFor="auth-email" className="text-xs">
                   Email Address
@@ -224,7 +422,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
                   ? "Processing..."
                   : mode === "signin"
                   ? "Sign In"
-                  : "Create Account"}
+                  : "Create Adviser Account"}
               </Button>
             </form>
           </CardContent>
