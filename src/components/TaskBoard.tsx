@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,23 +148,10 @@ export function TaskBoard({
     return "assigned";
   };
 
-  const handleUserChange = async (user: User | null, role: UserRole) => {
+  const handleUserChange = useCallback((user: User | null, role: UserRole) => {
     setCurrentUser(user);
     setUserRole(role);
-
-    try {
-      const supabase = createClient();
-      const { data: latestAdvisers } = await supabase
-        .from("advisers")
-        .select("*")
-        .order("year_level", { ascending: true });
-      if (latestAdvisers && latestAdvisers.length > 0) {
-        setAdvisers(latestAdvisers);
-      }
-    } catch {
-      // Continue with initial
-    }
-  };
+  }, []);
 
   // ==============================================================
   // ADMIN ACTIONS: Top "Assign a Task"
@@ -1615,10 +1602,12 @@ export function TaskBoard({
                                       !(declineReasonText[task.id] || "").trim()
                                     }
                                     onClick={() => handleDeclineTask(task.id)}
-                                    className="text-xs h-7 bg-rose-600 hover:bg-rose-700 text-white"
+                                    className="text-xs h-7 bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50"
                                   >
                                     {actionLoadingTaskId === task.id
                                       ? "Declining..."
+                                      : !(declineReasonText[task.id] || "").trim()
+                                      ? "Enter reason to decline"
                                       : "Confirm Decline"}
                                   </Button>
                                 </div>

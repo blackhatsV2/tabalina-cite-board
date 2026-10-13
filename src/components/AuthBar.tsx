@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,12 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
     return "adviser";
   };
 
+  // Keep a stable ref to onUserChange to prevent infinite re-render loops
+  const onUserChangeRef = useRef(onUserChange);
+  useEffect(() => {
+    onUserChangeRef.current = onUserChange;
+  }, [onUserChange]);
+
   useEffect(() => {
     const supabase = createClient();
 
@@ -45,7 +51,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
       setUser(user);
       const userRole = determineRole(user?.email);
       setRole(userRole);
-      onUserChange?.(user, userRole);
+      onUserChangeRef.current?.(user, userRole);
     });
 
     const {
@@ -55,13 +61,13 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
       setUser(currentUser);
       const userRole = determineRole(currentUser?.email);
       setRole(userRole);
-      onUserChange?.(currentUser, userRole);
+      onUserChangeRef.current?.(currentUser, userRole);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [onUserChange]);
+  }, []); // Run only once on mount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

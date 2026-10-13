@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   //
   // Turn them back on later if you want them, and read:
   // https://nextjs.org/docs/messages/blocking-prerender-dynamic
+  allowedDevOrigins: ["10.127.142.199", "localhost:3000"],
   turbopack: {
     rules: {
       "*.css": {
