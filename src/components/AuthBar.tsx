@@ -122,9 +122,9 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
       </div>
       <Button
         size="sm"
-        variant="ghost"
+        variant="outline"
         onClick={handleSignOut}
-        className="h-7 text-xs px-2.5 text-muted-foreground hover:text-foreground"
+        className="h-7 text-xs px-2.5 text-rose-600 border-rose-300/80 bg-rose-50/40 hover:bg-rose-100 hover:border-rose-400 hover:text-rose-700 dark:bg-rose-950/20 dark:text-rose-300 dark:border-rose-800 transition-all cursor-pointer shadow-2xs"
       >
         Sign Out
       </Button>

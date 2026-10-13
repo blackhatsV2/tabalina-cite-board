@@ -14,7 +14,6 @@ export function LandingPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [yearLevel, setYearLevel] = useState("Year 1");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -96,10 +95,11 @@ export function LandingPage() {
         }
       } else {
         const fullName = `${firstName.trim()} ${lastName.trim()}`.trim() || email.split("@")[0];
+        const defaultYear = "General";
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { first_name: firstName, last_name: lastName, full_name: fullName, year_level: yearLevel } },
+          options: { data: { first_name: firstName, last_name: lastName, full_name: fullName, year_level: defaultYear } },
         });
         if (error) {
           setMessage({ type: "error", text: error.message });
@@ -114,7 +114,7 @@ export function LandingPage() {
             if (!existing) {
               await supabase.from("advisers").insert({
                 name: fullName,
-                year_level: yearLevel,
+                year_level: defaultYear,
                 email: email.toLowerCase().trim(),
                 role: "adviser",
                 is_demo: false,
@@ -206,14 +206,14 @@ export function LandingPage() {
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             {/* Mode toggle */}
-            <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+            <div className="flex rounded-lg border border-border p-1 bg-muted/60 text-xs font-semibold gap-1">
               <button
                 type="button"
                 onClick={() => openMode("signin")}
-                className={`flex-1 py-2 transition-colors ${
+                className={`flex-1 py-2 rounded-md transition-all cursor-pointer ${
                   mode === "signin"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:text-foreground"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/80"
                 }`}
               >
                 Sign In
@@ -221,10 +221,10 @@ export function LandingPage() {
               <button
                 type="button"
                 onClick={() => openMode("signup")}
-                className={`flex-1 py-2 transition-colors ${
+                className={`flex-1 py-2 rounded-md transition-all cursor-pointer ${
                   mode === "signup"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:text-foreground"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/80"
                 }`}
               >
                 Create Account
@@ -232,46 +232,30 @@ export function LandingPage() {
             </div>
 
             {mode === "signup" && (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="lp-first" className="text-xs text-muted-foreground">First Name</Label>
-                    <Input
-                      id="lp-first"
-                      placeholder="Maria"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="lp-last" className="text-xs text-muted-foreground">Last Name</Label>
-                    <Input
-                      id="lp-last"
-                      placeholder="Santos"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      className="h-9 text-sm"
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="lp-first" className="text-xs text-muted-foreground">First Name</Label>
+                  <Input
+                    id="lp-first"
+                    placeholder="Maria"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    className="h-9 text-sm"
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="lp-year" className="text-xs text-muted-foreground">Year Level</Label>
-                  <select
-                    id="lp-year"
-                    value={yearLevel}
-                    onChange={(e) => setYearLevel(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="Year 1">Year 1</option>
-                    <option value="Year 2">Year 2</option>
-                    <option value="Year 3">Year 3</option>
-                    <option value="Year 4">Year 4</option>
-                  </select>
+                  <Label htmlFor="lp-last" className="text-xs text-muted-foreground">Last Name</Label>
+                  <Input
+                    id="lp-last"
+                    placeholder="Santos"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    className="h-9 text-sm"
+                  />
                 </div>
-              </>
+              </div>
             )}
 
             <div className="flex flex-col gap-1">
@@ -301,34 +285,6 @@ export function LandingPage() {
               />
             </div>
 
-            {mode === "signin" && (
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground py-0.5">
-                <span>Default Admins:</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail("Dean Admin");
-                      setPassword("password123");
-                    }}
-                    className="rounded border border-border bg-muted/60 px-2 py-0.5 font-medium hover:bg-muted text-foreground transition-colors"
-                  >
-                    Dean Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail("OIC Admin");
-                      setPassword("password123");
-                    }}
-                    className="rounded border border-border bg-muted/60 px-2 py-0.5 font-medium hover:bg-muted text-foreground transition-colors"
-                  >
-                    OIC Admin
-                  </button>
-                </div>
-              </div>
-            )}
-
             {message && (
               <p
                 className={`rounded-md px-3 py-2 text-xs ${
@@ -341,14 +297,14 @@ export function LandingPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={loading} className="h-10 text-sm font-semibold">
+            <Button type="submit" disabled={loading} className="h-10 text-sm font-semibold shadow-xs">
               {loading ? "Please wait…" : mode === "signin" ? "Sign In" : "Create Account"}
             </Button>
 
             <button
               type="button"
               onClick={() => openMode("idle")}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center"
+              className="text-xs font-medium text-muted-foreground hover:text-blue-600 hover:underline transition-colors text-center cursor-pointer py-1"
             >
               ← Back
             </button>
@@ -373,17 +329,17 @@ export function LandingPage() {
               type="button"
               disabled={loading}
               onClick={() => handleDemoLogin(dEmail)}
-              className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/30 px-3.5 py-2.5 text-left transition-colors hover:bg-muted/60 disabled:opacity-50"
+              className="flex items-center justify-between rounded-lg border border-blue-600/25 bg-blue-50/40 dark:bg-blue-950/20 px-3.5 py-2.5 text-left transition-all hover:bg-blue-100/70 hover:border-blue-600/60 dark:hover:bg-blue-900/40 cursor-pointer shadow-2xs disabled:opacity-50"
             >
               <div>
-                <p className="text-sm font-medium text-foreground">{label}</p>
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">{label}</p>
                 <p className="text-[11px] text-muted-foreground">{sub}</p>
               </div>
-              <span className="text-[11px] text-muted-foreground font-mono">{dEmail}</span>
+              <span className="text-[11px] text-blue-600 dark:text-blue-400 font-mono font-medium">{dEmail}</span>
             </button>
           ))}
           <p className="text-center text-[11px] text-muted-foreground mt-1">
-            Password for all demo accounts: <span className="font-semibold">password123</span>
+            Password for all demo accounts: <span className="font-semibold text-foreground">password123</span>
           </p>
         </div>
 

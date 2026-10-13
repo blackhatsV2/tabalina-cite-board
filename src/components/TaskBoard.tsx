@@ -42,6 +42,25 @@ export type Task = {
 
 export type { TaskComment };
 
+export const YEAR_LEVEL_OPTIONS = [
+  "1st Year",
+  "2nd Year",
+  "3rd Year",
+  "4th Year",
+  "General",
+] as const;
+
+export const formatYearLevel = (val?: string | null): string => {
+  if (!val) return "General";
+  const clean = val.trim();
+  if (clean === "Year 1" || clean === "1st Year" || clean === "1st year") return "1st Year";
+  if (clean === "Year 2" || clean === "2nd Year" || clean === "2nd year") return "2nd Year";
+  if (clean === "Year 3" || clean === "3rd Year" || clean === "3rd year") return "3rd Year";
+  if (clean === "Year 4" || clean === "4th Year" || clean === "4th year") return "4th Year";
+  if (clean.toLowerCase() === "general") return "General";
+  return clean;
+};
+
 interface TaskBoardProps {
   initialAdvisers: Adviser[];
   initialTasks: Task[];
@@ -77,7 +96,7 @@ export function TaskBoard({
       initialAdvisers[0]?.id ||
       ""
   );
-  const [shortcutYearLevel, setShortcutYearLevel] = useState("Year 1");
+  const [shortcutYearLevel, setShortcutYearLevel] = useState("1st Year");
   const [shortcutTitle, setShortcutTitle] = useState("");
   const [shortcutDesc, setShortcutDesc] = useState("");
   const [shortcutLocation, setShortcutLocation] = useState("");
@@ -90,7 +109,7 @@ export function TaskBoard({
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editFacultyId, setEditFacultyId] = useState("");
-  const [editYearLevel, setEditYearLevel] = useState("");
+  const [editYearLevel, setEditYearLevel] = useState("1st Year");
   const [editLocation, setEditLocation] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -103,7 +122,7 @@ export function TaskBoard({
   const [addingTaskFacultyId, setAddingTaskFacultyId] = useState<string | null>(null);
   const [addUnderTitle, setAddUnderTitle] = useState("");
   const [addUnderDesc, setAddUnderDesc] = useState("");
-  const [addUnderYearLevel, setAddUnderYearLevel] = useState("Year 1");
+  const [addUnderYearLevel, setAddUnderYearLevel] = useState("1st Year");
   const [addUnderLocation, setAddUnderLocation] = useState("");
   const [addUnderTime, setAddUnderTime] = useState("9:00 AM");
   const [addUnderDate, setAddUnderDate] = useState("Dec 16, 2026");
@@ -200,8 +219,7 @@ export function TaskBoard({
 
     setShortcutLoading(true);
     const eventDateCombined = `${shortcutDate.trim()}${shortcutTime.trim() ? `, ${shortcutTime.trim()}` : ""}`;
-    const targetAdviser = advisers.find((a) => a.id === shortcutFacultyId);
-    const assignedYearLevel = shortcutYearLevel || targetAdviser?.year_level || "Year 1";
+    const assignedYearLevel = shortcutYearLevel || "General";
 
     const supabase = createClient();
     try {
@@ -275,7 +293,7 @@ export function TaskBoard({
     setEditTitle(task.title);
     setEditDesc(task.description || "");
     setEditFacultyId(task.adviser_id || assignableAdvisers[0]?.id || "");
-    setEditYearLevel(task.year_level || advisers.find((a) => a.id === task.adviser_id)?.year_level || "Year 1");
+    setEditYearLevel(formatYearLevel(task.year_level));
     setEditLocation(task.venue);
     // Parse event date
     const parts = task.event_date.split(",");
@@ -497,8 +515,7 @@ export function TaskBoard({
     setAddUnderLoading(true);
 
     const eventDateCombined = `${addUnderDate.trim()}${addUnderTime.trim() ? `, ${addUnderTime.trim()}` : ""}`;
-    const targetAdviser = advisers.find((a) => a.id === facultyId);
-    const assignedYearLevel = addUnderYearLevel || targetAdviser?.year_level || "Year 1";
+    const assignedYearLevel = addUnderYearLevel || "General";
 
     const supabase = createClient();
     try {
@@ -733,6 +750,53 @@ export function TaskBoard({
   };
 
   // ==============================================================
+  // FACULTY ACTIONS: Update Profile Year Level (Self)
+  // ==============================================================
+  const [profileUpdating, setProfileUpdating] = useState(false);
+  const handleUpdateFacultyProfileYearLevel = async (newYear: string) => {
+    if (!activeAdviser?.id) return;
+    setProfileUpdating(true);
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from("advisers")
+        .update({ year_level: newYear })
+        .eq("id", activeAdviser.id);
+
+      if (!error) {
+        setAdvisers((prev) =>
+          prev.map((a) => (a.id === activeAdviser.id ? { ...a, year_level: newYear } : a))
+        );
+      }
+    } catch (err: unknown) {
+      console.error("Error updating profile year level:", err);
+    } finally {
+      setProfileUpdating(false);
+    }
+  };
+
+  // ==============================================================
+  // TASK YEAR LEVEL: Update Task Year Level (Independent of Profile)
+  // ==============================================================
+  const handleUpdateTaskYearLevel = async (taskId: string, newYear: string) => {
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ year_level: newYear })
+        .eq("id", taskId);
+
+      if (!error) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, year_level: newYear } : t))
+        );
+      }
+    } catch (err: unknown) {
+      console.error("Error updating task year level:", err);
+    }
+  };
+
+  // ==============================================================
   // DEMO / REAL DATA SEPARATION
   // ==============================================================
   // Demo accounts (all 3 preset emails) → see only demo tasks.
@@ -835,18 +899,12 @@ export function TaskBoard({
                       <select
                         id="sc-faculty"
                         value={shortcutFacultyId}
-                        onChange={(e) => {
-                          setShortcutFacultyId(e.target.value);
-                          const target = advisers.find((a) => a.id === e.target.value);
-                          if (target?.year_level) {
-                            setShortcutYearLevel(target.year_level);
-                          }
-                        }}
+                        onChange={(e) => setShortcutFacultyId(e.target.value)}
                         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       >
                         {assignableAdvisers.map((adv) => (
                           <option key={adv.id} value={adv.id}>
-                            {adv.name} ({adv.year_level})
+                            {adv.name}
                           </option>
                         ))}
                       </select>
@@ -862,11 +920,11 @@ export function TaskBoard({
                         onChange={(e) => setShortcutYearLevel(e.target.value)}
                         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       >
-                        <option value="Year 1">Year 1</option>
-                        <option value="Year 2">Year 2</option>
-                        <option value="Year 3">Year 3</option>
-                        <option value="Year 4">Year 4</option>
-                        <option value="General">General / All Years</option>
+                        {YEAR_LEVEL_OPTIONS.map((yl) => (
+                          <option key={yl} value={yl}>
+                            {yl}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -990,7 +1048,7 @@ export function TaskBoard({
                   {adminPendingTasks.map((task) => {
                     const assignedFaculty = advisers.find((a) => a.id === task.adviser_id);
                     const facultyName = assignedFaculty?.name || "Unassigned";
-                    const yearLevel = task.year_level || assignedFaculty?.year_level || "General";
+                    const yearLevel = formatYearLevel(task.year_level || assignedFaculty?.year_level);
                     const isExpanded = expandedPendingTaskId === task.id;
                     const status = getTaskStatus(task);
                     const isEditing = editingTaskId === task.id;
@@ -1017,7 +1075,7 @@ export function TaskBoard({
                                 {facultyName}
                               </span>
                               <span className="text-xs text-muted-foreground">•</span>
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              <span className="rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.5 text-[10px] font-semibold">
                                 {yearLevel}
                               </span>
                             </div>
@@ -1123,7 +1181,7 @@ export function TaskBoard({
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleDeleteTask(task.id)}
-                                      className="text-xs h-8 text-rose-600 hover:bg-rose-50 border-rose-200"
+                                      className="text-xs h-8 font-semibold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
                                     >
                                       Delete Task
                                     </Button>
@@ -1137,7 +1195,7 @@ export function TaskBoard({
                                         expandedCommentsTaskId === task.id ? null : task.id
                                       )
                                     }
-                                    className="text-xs h-8"
+                                    className="text-xs h-8 font-semibold"
                                   >
                                     Notes ({taskComments.length})
                                   </Button>
@@ -1181,11 +1239,11 @@ export function TaskBoard({
                                       onChange={(e) => setEditYearLevel(e.target.value)}
                                       className="h-8 rounded border border-input bg-background px-2 text-xs"
                                     >
-                                      <option value="Year 1">Year 1</option>
-                                      <option value="Year 2">Year 2</option>
-                                      <option value="Year 3">Year 3</option>
-                                      <option value="Year 4">Year 4</option>
-                                      <option value="General">General</option>
+                                      {YEAR_LEVEL_OPTIONS.map((yl) => (
+                                        <option key={yl} value={yl}>
+                                          {yl}
+                                        </option>
+                                      ))}
                                     </select>
                                   </div>
                                 </div>
@@ -1321,8 +1379,8 @@ export function TaskBoard({
                                   Admin
                                 </span>
                               )}
-                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                {faculty.year_level}
+                              <span className="rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 px-2 py-0.5 text-[10px] font-semibold">
+                                {formatYearLevel(faculty.year_level)}
                               </span>
                             </div>
                             <span className="text-xs text-muted-foreground">
@@ -1382,7 +1440,7 @@ export function TaskBoard({
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleDeleteAdviser(faculty.id, faculty.name)}
-                                  className="text-xs h-8 text-rose-600 hover:bg-rose-50 border-rose-200"
+                                  className="text-xs h-8 font-semibold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
                                 >
                                   Remove Account
                                 </Button>
@@ -1393,29 +1451,29 @@ export function TaskBoard({
                           {/* 2. Reassign Year Level */}
                           <div className="rounded-lg border border-border bg-card p-3 shadow-xs">
                             <Label className="text-xs font-semibold text-foreground block mb-1.5">
-                              Reassign Year Level
+                              Assign Faculty Year Level
                             </Label>
                             <div className="flex items-center gap-2">
                               <select
-                                value={reassignYearLevels[faculty.id] || faculty.year_level}
+                                value={formatYearLevel(reassignYearLevels[faculty.id] || faculty.year_level)}
                                 onChange={(e) =>
                                   setReassignYearLevels((prev) => ({
                                     ...prev,
                                     [faculty.id]: e.target.value,
                                   }))
                                 }
-                                className="flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring flex-1"
+                                className="flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring flex-1 font-medium cursor-pointer"
                               >
-                                <option value="Year 1">Year 1</option>
-                                <option value="Year 2">Year 2</option>
-                                <option value="Year 3">Year 3</option>
-                                <option value="Year 4">Year 4</option>
-                                <option value="General">General / Committee</option>
+                                {YEAR_LEVEL_OPTIONS.map((yl) => (
+                                  <option key={yl} value={yl}>
+                                    {yl}
+                                  </option>
+                                ))}
                               </select>
                               <Button
                                 size="sm"
                                 onClick={() => handleSaveReassignedYearLevel(faculty.id)}
-                                className="text-xs h-8"
+                                className="text-xs h-8 font-semibold"
                               >
                                 Save Year Level
                               </Button>
@@ -1433,9 +1491,9 @@ export function TaskBoard({
                                 variant="outline"
                                 onClick={() => {
                                   setAddingTaskFacultyId(isAddingTask ? null : faculty.id);
-                                  setAddUnderYearLevel(faculty.year_level);
+                                  setAddUnderYearLevel(formatYearLevel(faculty.year_level));
                                 }}
-                                className="text-xs h-7"
+                                className="text-xs h-7 font-semibold"
                               >
                                 {isAddingTask ? "Close" : "+ Add Another Task"}
                               </Button>
@@ -1453,7 +1511,7 @@ export function TaskBoard({
                                   onChange={(e) => setAddUnderTitle(e.target.value)}
                                   className="text-xs h-8"
                                 />
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                                   <Input
                                     placeholder="Venue (Room 205)"
                                     value={addUnderLocation}
@@ -1472,6 +1530,17 @@ export function TaskBoard({
                                     onChange={(e) => setAddUnderTime(e.target.value)}
                                     className="text-xs h-8"
                                   />
+                                  <select
+                                    value={addUnderYearLevel}
+                                    onChange={(e) => setAddUnderYearLevel(e.target.value)}
+                                    className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium cursor-pointer"
+                                  >
+                                    {YEAR_LEVEL_OPTIONS.map((yl) => (
+                                      <option key={yl} value={yl}>
+                                        {yl}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
                                 <Textarea
                                   placeholder="Description..."
@@ -1600,9 +1669,9 @@ export function TaskBoard({
         /* ============================================================== */
         <div className="flex flex-col gap-6">
           {/* Faculty Header Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold text-sm">
                 {activeAdviser?.name?.charAt(0) || "F"}
               </div>
               <div>
@@ -1610,14 +1679,33 @@ export function TaskBoard({
                   <h2 className="text-base font-bold text-foreground sm:text-lg">
                     {activeAdviser?.name || "Faculty Adviser"}
                   </h2>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                    {activeAdviser?.year_level || "Faculty"}
+                  <span className="rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 px-2.5 py-0.5 text-xs font-semibold">
+                    {formatYearLevel(activeAdviser?.year_level)}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Faculty Adviser — Task Designation Management
                 </p>
               </div>
+            </div>
+
+            {/* Profile Year Level Selection (Faculty can change in their profile) */}
+            <div className="flex items-center gap-2 rounded-xl border border-blue-200/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800 p-2 shadow-2xs">
+              <Label className="text-xs font-semibold text-blue-950 dark:text-blue-100 whitespace-nowrap">
+                My Year Level:
+              </Label>
+              <select
+                value={formatYearLevel(activeAdviser?.year_level)}
+                onChange={(e) => handleUpdateFacultyProfileYearLevel(e.target.value)}
+                disabled={profileUpdating}
+                className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+              >
+                {YEAR_LEVEL_OPTIONS.map((yl) => (
+                  <option key={yl} value={yl}>
+                    {yl}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1693,6 +1781,29 @@ export function TaskBoard({
                               </p>
                             )}
 
+                            {/* Task Year Level Selector (Separate from Profile) */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg border border-border bg-background">
+                              <div className="flex items-center gap-2">
+                                <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                                  Task Year Level:
+                                </Label>
+                                <select
+                                  value={formatYearLevel(task.year_level)}
+                                  onChange={(e) => handleUpdateTaskYearLevel(task.id, e.target.value)}
+                                  className="h-7 rounded border border-input bg-background px-2 text-xs font-semibold text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                  {YEAR_LEVEL_OPTIONS.map((yl) => (
+                                    <option key={yl} value={yl}>
+                                      {yl}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground italic">
+                                Task year level updates separately from your profile
+                              </span>
+                            </div>
+
                             {/* Action Buttons: Decline Tasks & Accept Tasks */}
                             {!isDeclining && !isAccepting && (
                               <div className="flex items-center justify-between pt-1 border-t border-border flex-wrap gap-2">
@@ -1704,7 +1815,7 @@ export function TaskBoard({
                                       setShowDeclineFormForTask(task.id);
                                       setShowAcceptFormForTask(null);
                                     }}
-                                    className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
+                                    className="text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
                                   >
                                     Decline Task
                                   </Button>
@@ -1714,7 +1825,7 @@ export function TaskBoard({
                                       setShowAcceptFormForTask(task.id);
                                       setShowDeclineFormForTask(null);
                                     }}
-                                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
                                   >
                                     Accept Task
                                   </Button>
@@ -1728,7 +1839,7 @@ export function TaskBoard({
                                       expandedCommentsTaskId === task.id ? null : task.id
                                     )
                                   }
-                                  className="text-xs"
+                                  className="text-xs font-semibold"
                                 >
                                   Notes ({taskComments.length})
                                 </Button>
@@ -1872,7 +1983,7 @@ export function TaskBoard({
                   {facultyAcceptedTasks.map((task) => {
                     const isExpanded = expandedAcceptedTaskId === task.id;
                     const taskComments = comments.filter((c) => c.task_id === task.id);
-                    const yearLevel = task.year_level || activeAdviser?.year_level || "Year Level";
+                    const yearLevel = formatYearLevel(task.year_level || activeAdviser?.year_level);
 
                     return (
                       <Card
@@ -1891,7 +2002,7 @@ export function TaskBoard({
                               {task.title}
                             </span>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              <span className="rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.5 text-[10px] font-semibold">
                                 {yearLevel}
                               </span>
                               <span>•</span>
@@ -1929,13 +2040,36 @@ export function TaskBoard({
                               </p>
                             )}
 
+                            {/* Task Year Level Selector (Separate from Profile) */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg border border-border bg-background">
+                              <div className="flex items-center gap-2">
+                                <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                                  Task Year Level:
+                                </Label>
+                                <select
+                                  value={formatYearLevel(task.year_level)}
+                                  onChange={(e) => handleUpdateTaskYearLevel(task.id, e.target.value)}
+                                  className="h-7 rounded border border-input bg-background px-2 text-xs font-semibold text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                  {YEAR_LEVEL_OPTIONS.map((yl) => (
+                                    <option key={yl} value={yl}>
+                                      {yl}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground italic">
+                                Task year level updates separately from your profile
+                              </span>
+                            </div>
+
                             {/* Remarks & Resolve Action */}
                             <div className="flex items-center justify-between pt-2 border-t border-border flex-wrap gap-2">
                               <Button
                                 size="sm"
                                 disabled={actionLoadingTaskId === task.id}
                                 onClick={() => handleResolveTask(task.id)}
-                                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
                               >
                                 {actionLoadingTaskId === task.id
                                   ? "Resolving..."
@@ -2126,8 +2260,8 @@ export function TaskBoard({
                                   {assignedPeer?.name || "Colleague"}
                                 </span>
                                 <span className="text-xs text-muted-foreground">•</span>
-                                <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground">
-                                  {assignedPeer?.year_level || task.year_level || "Year Level"}
+                                <span className="rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                  {formatYearLevel(task.year_level || assignedPeer?.year_level)}
                                 </span>
                               </div>
                               <span className="text-xs font-semibold text-foreground">

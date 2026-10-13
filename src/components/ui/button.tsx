@@ -3,17 +3,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] text-sm font-semibold transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:opacity-90",
-        secondary: "bg-secondary text-secondary-foreground hover:opacity-80",
+        default:
+          "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow hover:brightness-105",
+        secondary:
+          "bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border border-slate-300 dark:border-slate-600 shadow-2xs",
         outline:
-          "border border-border bg-transparent hover:bg-secondary hover:text-secondary-foreground",
-        ghost: "hover:bg-secondary hover:text-secondary-foreground",
+          "border-2 border-blue-600/40 bg-blue-50/40 hover:bg-blue-100 hover:border-blue-600 text-blue-700 dark:bg-blue-950/20 dark:border-blue-500/40 dark:text-blue-300 dark:hover:bg-blue-900/40 shadow-2xs",
+        ghost:
+          "text-slate-700 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-blue-950/40 dark:hover:text-blue-300",
         destructive:
-          "bg-destructive text-destructive-foreground hover:opacity-90",
+          "bg-rose-600 hover:bg-rose-700 text-white shadow-sm hover:shadow hover:brightness-105",
       },
       size: {
         default: "h-10 px-4 py-2",
