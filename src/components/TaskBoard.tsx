@@ -1000,7 +1000,7 @@ export function TaskBoard({
                   <div className="flex justify-end gap-2 pt-1">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="cancel"
                       size="sm"
                       onClick={() => setShowAssignShortcut(false)}
                       className="text-xs"
@@ -1287,7 +1287,7 @@ export function TaskBoard({
                                 <div className="flex justify-end gap-2 pt-1">
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="cancel"
                                     onClick={() => setEditingTaskId(null)}
                                     className="text-xs h-8"
                                   >
@@ -1551,7 +1551,7 @@ export function TaskBoard({
                                 <div className="flex justify-end gap-2 pt-1">
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="cancel"
                                     onClick={() => setAddingTaskFacultyId(null)}
                                     className="text-xs h-7"
                                   >
@@ -1870,7 +1870,7 @@ export function TaskBoard({
                                 <div className="flex justify-end gap-2 pt-1">
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="cancel"
                                     onClick={() => setShowDeclineFormForTask(null)}
                                     className="text-xs h-7"
                                   >
@@ -1918,7 +1918,7 @@ export function TaskBoard({
                                 <div className="flex justify-end gap-2 pt-1">
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="cancel"
                                     onClick={() => setShowAcceptFormForTask(null)}
                                     className="text-xs h-7"
                                   >

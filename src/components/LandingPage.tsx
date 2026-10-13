@@ -304,9 +304,9 @@ export function LandingPage() {
             <button
               type="button"
               onClick={() => openMode("idle")}
-              className="text-xs font-medium text-muted-foreground hover:text-blue-600 hover:underline transition-colors text-center cursor-pointer py-1"
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline transition-colors text-center cursor-pointer py-1"
             >
-              ← Back
+              ← Cancel / Back
             </button>
           </form>
         )}
