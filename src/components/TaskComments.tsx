@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { Loader2 } from "lucide-react";
 
 export type TaskComment = {
   id: string;
@@ -131,7 +132,14 @@ export function TaskComments({
           onClick={handleAddComment}
           disabled={submitting || !commentText.trim()}
         >
-          {submitting ? "Posting..." : "Send"}
+          {submitting ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+              <span>Sending…</span>
+            </>
+          ) : (
+            "Send"
+          )}
         </Button>
       </div>
     </div>

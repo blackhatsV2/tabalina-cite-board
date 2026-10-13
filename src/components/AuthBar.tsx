@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import type { User } from "@supabase/supabase-js";
 
+import { Loader2 } from "lucide-react";
+
 export type UserRole = "dean" | "oic" | "admin" | "adviser";
 
 interface AuthBarProps {
@@ -15,6 +17,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole>("adviser");
   const [displayName, setDisplayName] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
 
   const resolveRole = async (userEmail?: string | null): Promise<UserRole> => {
     if (!userEmail) return "adviser";
@@ -97,6 +100,7 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
   }, []);
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
     window.location.reload();
@@ -123,10 +127,18 @@ export function AuthBar({ onUserChange }: AuthBarProps) {
       <Button
         size="sm"
         variant="outline"
+        disabled={signingOut}
         onClick={handleSignOut}
-        className="h-7 text-xs px-2.5 text-rose-600 border-rose-300/80 bg-rose-50/40 hover:bg-rose-100 hover:border-rose-400 hover:text-rose-700 dark:bg-rose-950/20 dark:text-rose-300 dark:border-rose-800 transition-all cursor-pointer shadow-2xs"
+        className="h-7 text-xs px-2.5 text-rose-600 border-rose-300/80 bg-rose-50/40 hover:bg-rose-100 hover:border-rose-400 hover:text-rose-700 dark:bg-rose-950/20 dark:text-rose-300 dark:border-rose-800 transition-all cursor-pointer shadow-2xs disabled:opacity-60"
       >
-        Sign Out
+        {signingOut ? (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+            <span>Signing Out…</span>
+          </>
+        ) : (
+          "Sign Out"
+        )}
       </Button>
     </div>
   );

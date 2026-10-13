@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TaskComments, TaskComment } from "@/components/TaskComments";
 import { AuthBar, UserRole } from "@/components/AuthBar";
 import type { User } from "@supabase/supabase-js";
+import { Loader2 } from "lucide-react";
 
 export type Adviser = {
   id: string;
@@ -444,6 +445,7 @@ export function TaskBoard({
   const handleDeleteTask = async (taskId: string) => {
     if (!window.confirm("Are you sure you want to delete this task?")) return;
 
+    setActionLoadingTaskId(taskId);
     const supabase = createClient();
     try {
       const { error } = await supabase.from("tasks").delete().eq("id", taskId);
@@ -456,6 +458,8 @@ export function TaskBoard({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error deleting task";
       alert("Error: " + msg);
+    } finally {
+      setActionLoadingTaskId(null);
     }
   };
 
@@ -470,6 +474,7 @@ export function TaskBoard({
     )
       return;
 
+    setActionLoadingTaskId(adviserId);
     const supabase = createClient();
     try {
       // Unassign tasks first so foreign key constraint doesn't block deletion
@@ -483,6 +488,8 @@ export function TaskBoard({
       setExpandedFacultyId(null);
     } catch (err: unknown) {
       alert("Error: " + (err instanceof Error ? err.message : "Unexpected error"));
+    } finally {
+      setActionLoadingTaskId(null);
     }
   };
 
@@ -490,6 +497,7 @@ export function TaskBoard({
   // ADMIN ACTIONS: Approve Task
   // ==============================================================
   const handleApprovePendingTask = async (taskId: string) => {
+    setActionLoadingTaskId(taskId);
     const isDean = userRole === "dean";
     const isOic = userRole === "oic";
     const updatePayload = isDean
@@ -511,6 +519,8 @@ export function TaskBoard({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error approving task";
       alert("Error: " + msg);
+    } finally {
+      setActionLoadingTaskId(null);
     }
   };
 
@@ -1125,7 +1135,14 @@ export function TaskBoard({
                       disabled={shortcutLoading || !shortcutTitle.trim()}
                       className="text-xs"
                     >
-                      {shortcutLoading ? "Assigning..." : "Assign Task"}
+                      {shortcutLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                          <span>Assigning…</span>
+                        </>
+                      ) : (
+                        "Assign Task"
+                      )}
                     </Button>
                   </div>
                 </form>
@@ -1249,10 +1266,18 @@ export function TaskBoard({
                                 </div>
                                 <Button
                                   size="sm"
+                                  disabled={actionLoadingTaskId === task.id}
                                   onClick={() => handleApprovePendingTask(task.id)}
                                   className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
-                                  Approve as {userRole === "dean" ? "Dean" : userRole === "oic" ? "OIC" : "Admin"}
+                                  {actionLoadingTaskId === task.id ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                      <span>Approving…</span>
+                                    </>
+                                  ) : (
+                                    `Approve as ${userRole === "dean" ? "Dean" : userRole === "oic" ? "OIC" : "Admin"}`
+                                  )}
                                 </Button>
                               </div>
                             )}
@@ -1292,10 +1317,18 @@ export function TaskBoard({
                                     <Button
                                       size="sm"
                                       variant="outline"
+                                      disabled={actionLoadingTaskId === task.id}
                                       onClick={() => handleDeleteTask(task.id)}
                                       className="text-xs h-8 font-semibold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
                                     >
-                                      Delete Task
+                                      {actionLoadingTaskId === task.id ? (
+                                        <>
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                          <span>Deleting…</span>
+                                        </>
+                                      ) : (
+                                        "Delete Task"
+                                      )}
                                     </Button>
                                   </div>
 
@@ -1416,7 +1449,14 @@ export function TaskBoard({
                                     onClick={() => handleSaveEditTask(task.id)}
                                     className="text-xs h-8"
                                   >
-                                    {editLoading ? "Updating..." : "Update & Pass to Faculty"}
+                                    {editLoading ? (
+                                      <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                        <span>Updating…</span>
+                                      </>
+                                    ) : (
+                                      "Update & Pass to Faculty"
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -1556,10 +1596,18 @@ export function TaskBoard({
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  disabled={actionLoadingTaskId === faculty.id}
                                   onClick={() => handleDeleteAdviser(faculty.id, faculty.name)}
                                   className="text-xs h-8 font-semibold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
                                 >
-                                  Remove Account
+                                  {actionLoadingTaskId === faculty.id ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                      <span>Removing…</span>
+                                    </>
+                                  ) : (
+                                    "Remove Account"
+                                  )}
                                 </Button>
                               </div>
                             </div>
@@ -1685,7 +1733,14 @@ export function TaskBoard({
                                     onClick={() => handleAddUnderFaculty(faculty.id)}
                                     className="text-xs h-7"
                                   >
-                                    {addUnderLoading ? "Adding..." : "Add Task"}
+                                    {addUnderLoading ? (
+                                      <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                        <span>Adding…</span>
+                                      </>
+                                    ) : (
+                                      "Add Task"
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -1762,10 +1817,18 @@ export function TaskBoard({
                                             <Button
                                               size="sm"
                                               variant="outline"
+                                              disabled={actionLoadingTaskId === t.id}
                                               onClick={() => handleDeleteTask(t.id)}
                                               className="text-[11px] h-6 px-2 text-rose-600 hover:bg-rose-50 border-rose-200"
                                             >
-                                              Delete Task
+                                              {actionLoadingTaskId === t.id ? (
+                                                <>
+                                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                  <span>Deleting…</span>
+                                                </>
+                                              ) : (
+                                                "Delete Task"
+                                              )}
                                             </Button>
                                           </div>
                                         </div>
@@ -2007,11 +2070,16 @@ export function TaskBoard({
                                     onClick={() => handleDeclineTask(task.id)}
                                     className="text-xs h-7 bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50"
                                   >
-                                    {actionLoadingTaskId === task.id
-                                      ? "Declining..."
-                                      : !(declineReasonText[task.id] || "").trim()
-                                      ? "Enter reason to decline"
-                                      : "Confirm Decline"}
+                                    {actionLoadingTaskId === task.id ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                        <span>Declining…</span>
+                                      </>
+                                    ) : !(declineReasonText[task.id] || "").trim() ? (
+                                      "Enter reason to decline"
+                                    ) : (
+                                      "Confirm Decline"
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -2052,9 +2120,14 @@ export function TaskBoard({
                                     onClick={() => handleAcceptTask(task.id)}
                                     className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white"
                                   >
-                                    {actionLoadingTaskId === task.id
-                                      ? "Accepting..."
-                                      : "Confirm Acceptance"}
+                                    {actionLoadingTaskId === task.id ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                        <span>Accepting…</span>
+                                      </>
+                                    ) : (
+                                      "Confirm Acceptance"
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -2193,9 +2266,14 @@ export function TaskBoard({
                                 onClick={() => handleResolveTask(task.id)}
                                 className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
                               >
-                                {actionLoadingTaskId === task.id
-                                  ? "Resolving..."
-                                  : "Mark as Resolved"}
+                                {actionLoadingTaskId === task.id ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                    <span>Resolving…</span>
+                                  </>
+                                ) : (
+                                  "Mark as Resolved"
+                                )}
                               </Button>
 
                               <Button

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 type AuthMode = "idle" | "signin" | "signup";
 
@@ -18,6 +18,7 @@ export function LandingPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingDemoEmail, setLoadingDemoEmail] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const openMode = (m: AuthMode) => {
@@ -28,6 +29,7 @@ export function LandingPage() {
     setShowPassword(false);
     setFirstName("");
     setLastName("");
+    setLoadingDemoEmail(null);
   };
 
   const normalizeEmail = (raw: string) => {
@@ -143,6 +145,7 @@ export function LandingPage() {
 
   const handleDemoLogin = async (demoEmail: string) => {
     setLoading(true);
+    setLoadingDemoEmail(demoEmail);
     setMessage(null);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email: demoEmail, password: "password123" });
@@ -159,6 +162,7 @@ export function LandingPage() {
       if (signUpError) {
         setMessage({ type: "error", text: `Could not sign in: ${signUpError.message}` });
         setLoading(false);
+        setLoadingDemoEmail(null);
         return;
       }
       try {
@@ -317,7 +321,16 @@ export function LandingPage() {
             )}
 
             <Button type="submit" disabled={loading} className="h-10 text-sm font-semibold shadow-xs">
-              {loading ? "Please wait…" : mode === "signin" ? "Sign In" : "Create Account"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                  <span>{mode === "signin" ? "Signing In…" : "Creating Account…"}</span>
+                </>
+              ) : mode === "signin" ? (
+                "Sign In"
+              ) : (
+                "Create Account"
+              )}
             </Button>
 
             <button
@@ -342,21 +355,29 @@ export function LandingPage() {
           <p className="text-[11px] text-muted-foreground text-center">
             Demo accounts use sandboxed data — separate from the real board.
           </p>
-          {demoAccounts.map(({ email: dEmail, label, sub }) => (
-            <button
-              key={dEmail}
-              type="button"
-              disabled={loading}
-              onClick={() => handleDemoLogin(dEmail)}
-              className="flex items-center justify-between rounded-lg border border-blue-600/25 bg-blue-50/40 dark:bg-blue-950/20 px-3.5 py-2.5 text-left transition-all hover:bg-blue-100/70 hover:border-blue-600/60 dark:hover:bg-blue-900/40 cursor-pointer shadow-2xs disabled:opacity-50"
-            >
-              <div>
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">{label}</p>
-                <p className="text-[11px] text-muted-foreground">{sub}</p>
-              </div>
-              <span className="text-[11px] text-blue-600 dark:text-blue-400 font-mono font-medium">{dEmail}</span>
-            </button>
-          ))}
+          {demoAccounts.map(({ email: dEmail, label, sub }) => {
+            const isThisLoading = loadingDemoEmail === dEmail;
+            return (
+              <button
+                key={dEmail}
+                type="button"
+                disabled={loading}
+                onClick={() => handleDemoLogin(dEmail)}
+                className="flex items-center justify-between rounded-lg border border-blue-600/25 bg-blue-50/40 dark:bg-blue-950/20 px-3.5 py-2.5 text-left transition-all hover:bg-blue-100/70 hover:border-blue-600/60 dark:hover:bg-blue-900/40 cursor-pointer shadow-2xs disabled:opacity-60"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">{label}</p>
+                    {isThisLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" />}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{sub}</p>
+                </div>
+                <span className="text-[11px] text-blue-600 dark:text-blue-400 font-mono font-medium">
+                  {isThisLoading ? "Connecting…" : dEmail}
+                </span>
+              </button>
+            );
+          })}
           <p className="text-center text-[11px] text-muted-foreground mt-1">
             Password for all demo accounts: <span className="font-semibold text-foreground">password123</span>
           </p>
