@@ -38,6 +38,7 @@ export type Task = {
   confirmed_at: string | null;
   accepted_at?: string | null;
   completed_at?: string | null;
+  declined_at?: string | null;
   oic_approval: string;
   dean_approval: string;
   is_demo?: boolean | null;
@@ -184,6 +185,8 @@ export function TaskTimelineBadges({ task }: { task: Task }) {
   const postedAt = formatTimestamp(task.created_at);
   const acceptedAt = formatTimestamp(task.accepted_at || task.confirmed_at);
   const finishedAt = formatTimestamp(task.completed_at);
+  const isDeclined = task.status === "declined";
+  const declinedAt = formatTimestamp(task.declined_at) || (isDeclined ? formatTimestamp(task.created_at) : "");
 
   return (
     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-[11px]">
@@ -203,6 +206,12 @@ export function TaskTimelineBadges({ task }: { task: Task }) {
         <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/40">
           <span className="font-semibold">Finished:</span>
           <span>{finishedAt}</span>
+        </span>
+      )}
+      {isDeclined && (
+        <span className="inline-flex items-center gap-1 rounded bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40">
+          <span className="font-semibold">Declined:</span>
+          <span>{declinedAt || "Recorded"}</span>
         </span>
       )}
     </div>
@@ -283,8 +292,10 @@ export function TaskBoard({
   const [showAcceptFormForTask, setShowAcceptFormForTask] = useState<string | null>(null);
   const [actionLoadingTaskId, setActionLoadingTaskId] = useState<string | null>(null);
 
-  // Faculty bottom section active tab ("finished" vs "other-faculties")
-  const [bottomTab, setBottomTab] = useState<"finished" | "other-faculties">("finished");
+  // Faculty bottom section active tab ("finished" vs "declined" vs "other-faculties")
+  const [bottomTab, setBottomTab] = useState<"finished" | "declined" | "other-faculties">("finished");
+  const [declinedSubFilter, setDeclinedSubFilter] = useState<"all" | "mine" | "others">("all");
+  const [expandedDeclinedTaskId, setExpandedDeclinedTaskId] = useState<string | null>(null);
 
   // Top-level View Tab: Tasks Board vs Global Chat
   const [mainTab, setMainTab] = useState<"tasks" | "chat">("tasks");
@@ -547,6 +558,7 @@ export function TaskBoard({
       event_date: eventDateCombined,
       status: "assigned", // Reset to assigned so faculty receives it freshly
       decline_reason: null,
+      declined_at: null,
       is_confirmed: false,
       confirmed_at: null,
       accepted_at: null,
@@ -834,9 +846,11 @@ export function TaskBoard({
     const supabase = createClient();
 
     try {
+      const nowIso = new Date().toISOString();
       const updatePayload = {
         status: "declined",
         decline_reason: reason,
+        declined_at: nowIso,
         is_confirmed: false,
       };
 
@@ -851,6 +865,8 @@ export function TaskBoard({
         await supabase
           .from("tasks")
           .update({
+            status: "declined",
+            decline_reason: reason,
             description: `${target?.description || ""} [DECLINED: ${reason}]`,
             is_confirmed: false,
           })
@@ -860,13 +876,14 @@ export function TaskBoard({
       setTasks((prev) =>
         prev.map((t) =>
           t.id === taskId
-            ? { ...t, status: "declined", decline_reason: reason, is_confirmed: false }
+            ? { ...t, status: "declined", decline_reason: reason, declined_at: nowIso, is_confirmed: false }
             : t
         )
       );
 
       setShowDeclineFormForTask(null);
       setExpandedNewTaskId(null);
+      setBottomTab("declined");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error declining task";
       alert("Error: " + msg);
@@ -1092,6 +1109,16 @@ export function TaskBoard({
   const facultyFinishedTasks = myOwnTasks.filter((t) => getTaskStatus(t) === "completed");
 
   const otherFacultiesTasks = visibleTasks.filter((t) => t.adviser_id !== activeAdviser?.id);
+  const myDeclinedTasks = myOwnTasks.filter((t) => getTaskStatus(t) === "declined");
+  const otherDeclinedTasks = otherFacultiesTasks.filter((t) => getTaskStatus(t) === "declined");
+  const allDeclinedTasks = visibleTasks.filter((t) => getTaskStatus(t) === "declined");
+
+  const displayedDeclinedTasks =
+    declinedSubFilter === "mine"
+      ? myDeclinedTasks
+      : declinedSubFilter === "others"
+      ? otherDeclinedTasks
+      : allDeclinedTasks;
 
   return (
     <div className="flex flex-col gap-6">
@@ -2565,7 +2592,7 @@ export function TaskBoard({
           {/* FACULTY BOTTOM SECTION: Finished Tasks & Tasks from Other Faculties */}
           {/* ============================================================== */}
           <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs flex flex-col gap-4">
-            <div className="flex border-b border-border pb-2 gap-4">
+            <div className="flex border-b border-border pb-2 gap-4 flex-wrap">
               <button
                 type="button"
                 onClick={() => setBottomTab("finished")}
@@ -2578,6 +2605,21 @@ export function TaskBoard({
                 <span>Finished Tasks</span>
                 <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.2">
                   {facultyFinishedTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBottomTab("declined")}
+                className={`flex items-center gap-2 pb-2 text-sm font-semibold transition-colors border-b-2 ${
+                  bottomTab === "declined"
+                    ? "border-rose-600 text-rose-600 dark:border-rose-400 dark:text-rose-400"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span>Declined Tasks</span>
+                <span className="rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 text-[10px] font-bold px-2 py-0.2">
+                  {allDeclinedTasks.length}
                 </span>
               </button>
 
@@ -2682,6 +2724,178 @@ export function TaskBoard({
               </div>
             )}
 
+            {/* TAB 2: Declined Tasks (By Me & Other Faculties) */}
+            {bottomTab === "declined" && (
+              <div className="flex flex-col gap-3">
+                {/* Sub-filter pills */}
+                <div className="flex items-center gap-2 flex-wrap pb-1">
+                  <span className="text-xs font-semibold text-muted-foreground mr-1">Filter:</span>
+                  <button
+                    type="button"
+                    onClick={() => setDeclinedSubFilter("all")}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                      declinedSubFilter === "all"
+                        ? "bg-rose-600 text-white"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Declined ({allDeclinedTasks.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeclinedSubFilter("mine")}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                      declinedSubFilter === "mine"
+                        ? "bg-rose-600 text-white"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Declined by Me ({myDeclinedTasks.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeclinedSubFilter("others")}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                      declinedSubFilter === "others"
+                        ? "bg-rose-600 text-white"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Declined by Other Faculties ({otherDeclinedTasks.length})
+                  </button>
+                </div>
+
+                {displayedDeclinedTasks.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic p-4 text-center">
+                    {declinedSubFilter === "mine"
+                      ? "You haven't declined any tasks."
+                      : declinedSubFilter === "others"
+                      ? "No tasks declined by other faculties."
+                      : "No declined tasks recorded."}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {displayedDeclinedTasks.map((task) => {
+                      const isMine =
+                        task.adviser_id === activeAdviser?.id ||
+                        (isCurrentUserDemo &&
+                          (!task.adviser_id ||
+                            advisers.find((a) => a.id === task.adviser_id)?.email?.toLowerCase() ===
+                              "faculty@gmail.com"));
+                      const assignedPeer = advisers.find((a) => a.id === task.adviser_id);
+                      const isExpanded = expandedDeclinedTaskId === task.id;
+                      const taskComments = comments.filter((c) => c.task_id === task.id);
+                      const yearLevel = formatYearLevel(task.year_level || assignedPeer?.year_level);
+
+                      return (
+                        <Card key={task.id} className="border-rose-200/80 dark:border-rose-900/60 shadow-xs">
+                          <div
+                            onClick={() =>
+                              setExpandedDeclinedTaskId(isExpanded ? null : task.id)
+                            }
+                            className="flex cursor-pointer items-center justify-between p-3.5 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 rounded-lg transition-colors"
+                          >
+                            <div className="flex flex-col gap-1 pr-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isMine ? (
+                                  <span className="rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200 px-2 py-0.5 text-[10px] font-bold border border-rose-300 dark:border-rose-800">
+                                    Declined by You
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 text-[10px] font-bold border border-slate-300 dark:border-slate-700">
+                                    Declined by {assignedPeer?.name || "Colleague"}
+                                  </span>
+                                )}
+                                <span className="rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                  {yearLevel}
+                                </span>
+                              </div>
+                              <span className="text-sm font-semibold text-foreground">
+                                {task.title}
+                              </span>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                                <span>Schedule: {task.event_date}</span>
+                                <span>•</span>
+                                <span>Venue: {task.venue}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="rounded-full bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 px-2 py-0.5 text-[10px] font-bold">
+                                Declined
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {isExpanded ? "Hide" : "Details"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="border-t border-rose-200/60 dark:border-rose-900/60 p-4 bg-muted/10 flex flex-col gap-3 text-xs">
+                              {/* Reason Box */}
+                              <div className="rounded-lg border border-rose-300 dark:border-rose-900 bg-rose-50/90 dark:bg-rose-950/40 p-3 flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="font-bold text-rose-900 dark:text-rose-200 flex items-center gap-1.5">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-rose-600"></span>
+                                    Reason for Declining:
+                                  </span>
+                                  {task.declined_at && (
+                                    <span className="text-[11px] text-rose-700 dark:text-rose-300 font-medium">
+                                      Declined on {formatTimestamp(task.declined_at)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-rose-950 dark:text-rose-100 italic pl-3 leading-relaxed">
+                                  &ldquo;{task.decline_reason || "No explanation provided."}&rdquo;
+                                </p>
+                              </div>
+
+                              {task.description && (
+                                <div className="bg-background p-2.5 rounded border border-border">
+                                  <strong>Original Instructions:</strong> {task.description}
+                                </div>
+                              )}
+
+                              <TaskTimelineBadges task={task} />
+
+                              {/* Coordinator Notes Drawer */}
+                              <div className="pt-2 border-t border-border flex items-center justify-between">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setExpandedCommentsTaskId(
+                                      expandedCommentsTaskId === task.id ? null : task.id
+                                    )
+                                  }
+                                  className="text-xs h-7"
+                                >
+                                  Coordinator Notes ({taskComments.length})
+                                </Button>
+                              </div>
+
+                              {expandedCommentsTaskId === task.id && (
+                                <div className="mt-1">
+                                  <TaskComments
+                                    taskId={task.id}
+                                    comments={taskComments}
+                                    authorName={effectiveAuthorName}
+                                    onCommentAdded={(newComment) =>
+                                      setComments((prev) => [...prev, newComment])
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* TAB 2: Tasks from Other Faculties */}
             {bottomTab === "other-faculties" && (
               <div>
@@ -2759,6 +2973,17 @@ export function TaskBoard({
                               {task.description && (
                                 <div>
                                   <strong>Instructions:</strong> {task.description}
+                                </div>
+                              )}
+                              {status === "declined" && (
+                                <div className="rounded-md border border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-2.5 text-xs text-rose-900 dark:text-rose-200 flex flex-col gap-1">
+                                  <div className="font-bold flex items-center gap-1.5 text-rose-800 dark:text-rose-300">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
+                                    Decline Reason:
+                                  </div>
+                                  <p className="italic pl-3 text-rose-950 dark:text-rose-100">
+                                    &ldquo;{task.decline_reason || "No reason specified."}&rdquo;
+                                  </p>
                                 </div>
                               )}
                               <TaskTimelineBadges task={task} />
