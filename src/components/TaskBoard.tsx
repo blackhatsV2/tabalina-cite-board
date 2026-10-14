@@ -65,8 +65,23 @@ export const formatYearLevel = (val?: string | null): string => {
   return clean;
 };
 
+export function getCurrentDateISO(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function getCurrentTime24(): string {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 export function parseDateToISO(dateStr: string): string {
-  if (!dateStr) return "2026-12-16";
+  if (!dateStr) return getCurrentDateISO();
   const trimmed = dateStr.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
   const parsed = Date.parse(trimmed);
@@ -77,11 +92,11 @@ export function parseDateToISO(dateStr: string): string {
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
-  return "2026-12-16";
+  return getCurrentDateISO();
 }
 
 export function parseTimeTo24(timeStr: string): string {
-  if (!timeStr) return "09:00";
+  if (!timeStr) return getCurrentTime24();
   const trimmed = timeStr.trim();
   if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) return trimmed;
   const match = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
@@ -93,13 +108,13 @@ export function parseTimeTo24(timeStr: string): string {
     if (ampm === "AM" && hour === 12) hour = 0;
     return `${String(hour).padStart(2, "0")}:${minute}`;
   }
-  return "09:00";
+  return getCurrentTime24();
 }
 
 export function parseEventDate(eventDate: string): { isoDate: string; time24: string } {
-  if (!eventDate) return { isoDate: "2026-12-16", time24: "09:00" };
+  if (!eventDate) return { isoDate: getCurrentDateISO(), time24: getCurrentTime24() };
   const timeMatch = eventDate.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
-  let timeStr = "09:00";
+  let timeStr = "";
   let datePart = eventDate;
   if (timeMatch) {
     timeStr = timeMatch[1].trim();
@@ -111,7 +126,7 @@ export function parseEventDate(eventDate: string): { isoDate: string; time24: st
   }
   return {
     isoDate: parseDateToISO(datePart),
-    time24: parseTimeTo24(timeStr),
+    time24: timeStr ? parseTimeTo24(timeStr) : getCurrentTime24(),
   };
 }
 
@@ -233,8 +248,8 @@ export function TaskBoard({
   const [shortcutTitle, setShortcutTitle] = useState("");
   const [shortcutDesc, setShortcutDesc] = useState("");
   const [shortcutLocation, setShortcutLocation] = useState("");
-  const [shortcutTime, setShortcutTime] = useState("09:00");
-  const [shortcutDate, setShortcutDate] = useState("2026-12-16");
+  const [shortcutTime, setShortcutTime] = useState(getCurrentTime24());
+  const [shortcutDate, setShortcutDate] = useState(getCurrentDateISO());
   const [shortcutLoading, setShortcutLoading] = useState(false);
 
   // Editing state for Admin pending task
@@ -244,8 +259,8 @@ export function TaskBoard({
   const [editFacultyId, setEditFacultyId] = useState("");
   const [editYearLevel, setEditYearLevel] = useState("1st Year");
   const [editLocation, setEditLocation] = useState("");
-  const [editTime, setEditTime] = useState("09:00");
-  const [editDate, setEditDate] = useState("2026-12-16");
+  const [editTime, setEditTime] = useState(getCurrentTime24());
+  const [editDate, setEditDate] = useState(getCurrentDateISO());
   const [editLoading, setEditLoading] = useState(false);
 
   // Reassign year level state for Admin Faculty list
@@ -257,8 +272,8 @@ export function TaskBoard({
   const [addUnderDesc, setAddUnderDesc] = useState("");
   const [addUnderYearLevel, setAddUnderYearLevel] = useState("1st Year");
   const [addUnderLocation, setAddUnderLocation] = useState("");
-  const [addUnderTime, setAddUnderTime] = useState("09:00");
-  const [addUnderDate, setAddUnderDate] = useState("2026-12-16");
+  const [addUnderTime, setAddUnderTime] = useState(getCurrentTime24());
+  const [addUnderDate, setAddUnderDate] = useState(getCurrentDateISO());
   const [addUnderLoading, setAddUnderLoading] = useState(false);
 
   // Faculty response state (Decline & Accept forms)
@@ -344,6 +359,16 @@ export function TaskBoard({
   const handleUserChange = useCallback((user: User | null, role: UserRole) => {
     setCurrentUser(user);
     setUserRole(role);
+  }, []);
+
+  // Sync client local date and time on mount to prevent SSR timezone discrepancy
+  useEffect(() => {
+    const curDate = getCurrentDateISO();
+    const curTime = getCurrentTime24();
+    setShortcutDate(curDate);
+    setShortcutTime(curTime);
+    setAddUnderDate(curDate);
+    setAddUnderTime(curTime);
   }, []);
 
   // ==============================================================
@@ -481,6 +506,8 @@ export function TaskBoard({
       setShortcutTitle("");
       setShortcutDesc("");
       setShortcutLocation("");
+      setShortcutDate(getCurrentDateISO());
+      setShortcutTime(getCurrentTime24());
       setShowAssignShortcut(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unexpected error";
@@ -502,8 +529,8 @@ export function TaskBoard({
     setEditLocation(task.venue);
     // Parse event date
     const { isoDate, time24 } = parseEventDate(task.event_date);
-    setEditDate(isoDate);
-    setEditTime(time24);
+    setEditDate(isoDate || getCurrentDateISO());
+    setEditTime(time24 || getCurrentTime24());
   };
 
   const handleSaveEditTask = async (taskId: string) => {
@@ -782,6 +809,8 @@ export function TaskBoard({
       setAddUnderTitle("");
       setAddUnderDesc("");
       setAddUnderLocation("");
+      setAddUnderDate(getCurrentDateISO());
+      setAddUnderTime(getCurrentTime24());
       setAddingTaskFacultyId(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error creating task";
@@ -1156,7 +1185,14 @@ export function TaskBoard({
 
             <Button
               size="sm"
-              onClick={() => setShowAssignShortcut(!showAssignShortcut)}
+              onClick={() => {
+                const nextState = !showAssignShortcut;
+                setShowAssignShortcut(nextState);
+                if (nextState) {
+                  setShortcutDate(getCurrentDateISO());
+                  setShortcutTime(getCurrentTime24());
+                }
+              }}
               className="text-xs font-semibold shadow-xs"
             >
               {showAssignShortcut ? "Close Form" : "+ Assign a Task"}
@@ -1250,7 +1286,13 @@ export function TaskBoard({
                         type="date"
                         value={shortcutDate}
                         onChange={(e) => setShortcutDate(e.target.value)}
-                        onClick={(e) => e.currentTarget.showPicker?.()}
+                        onClick={(e) => {
+                          if (!shortcutDate) setShortcutDate(getCurrentDateISO());
+                          e.currentTarget.showPicker?.();
+                        }}
+                        onFocus={(e) => {
+                          if (!shortcutDate) setShortcutDate(getCurrentDateISO());
+                        }}
                         required
                         className="text-xs h-9 cursor-pointer"
                       />
@@ -1265,7 +1307,13 @@ export function TaskBoard({
                         list="task-time-options"
                         value={shortcutTime}
                         onChange={(e) => setShortcutTime(e.target.value)}
-                        onClick={(e) => e.currentTarget.showPicker?.()}
+                        onClick={(e) => {
+                          if (!shortcutTime) setShortcutTime(getCurrentTime24());
+                          e.currentTarget.showPicker?.();
+                        }}
+                        onFocus={(e) => {
+                          if (!shortcutTime) setShortcutTime(getCurrentTime24());
+                        }}
                         required
                         className="text-xs h-9 cursor-pointer"
                       />
@@ -1576,7 +1624,13 @@ export function TaskBoard({
                                       type="date"
                                       value={editDate}
                                       onChange={(e) => setEditDate(e.target.value)}
-                                      onClick={(e) => e.currentTarget.showPicker?.()}
+                                      onClick={(e) => {
+                                        if (!editDate) setEditDate(getCurrentDateISO());
+                                        e.currentTarget.showPicker?.();
+                                      }}
+                                      onFocus={(e) => {
+                                        if (!editDate) setEditDate(getCurrentDateISO());
+                                      }}
                                       className="text-xs h-8 cursor-pointer"
                                     />
                                   </div>
@@ -1587,7 +1641,13 @@ export function TaskBoard({
                                       list="task-time-options"
                                       value={editTime}
                                       onChange={(e) => setEditTime(e.target.value)}
-                                      onClick={(e) => e.currentTarget.showPicker?.()}
+                                      onClick={(e) => {
+                                        if (!editTime) setEditTime(getCurrentTime24());
+                                        e.currentTarget.showPicker?.();
+                                      }}
+                                      onFocus={(e) => {
+                                        if (!editTime) setEditTime(getCurrentTime24());
+                                      }}
                                       className="text-xs h-8 cursor-pointer"
                                     />
                                   </div>
@@ -1823,8 +1883,13 @@ export function TaskBoard({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  setAddingTaskFacultyId(isAddingTask ? null : faculty.id);
+                                  const willOpen = !isAddingTask;
+                                  setAddingTaskFacultyId(willOpen ? faculty.id : null);
                                   setAddUnderYearLevel(formatYearLevel(faculty.year_level));
+                                  if (willOpen) {
+                                    setAddUnderDate(getCurrentDateISO());
+                                    setAddUnderTime(getCurrentTime24());
+                                  }
                                 }}
                                 className="text-xs h-7 font-semibold"
                               >
@@ -1856,7 +1921,13 @@ export function TaskBoard({
                                     aria-label="Date"
                                     value={addUnderDate}
                                     onChange={(e) => setAddUnderDate(e.target.value)}
-                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => {
+                                      if (!addUnderDate) setAddUnderDate(getCurrentDateISO());
+                                      e.currentTarget.showPicker?.();
+                                    }}
+                                    onFocus={(e) => {
+                                      if (!addUnderDate) setAddUnderDate(getCurrentDateISO());
+                                    }}
                                     className="text-xs h-8 cursor-pointer"
                                   />
                                   <Input
@@ -1865,7 +1936,13 @@ export function TaskBoard({
                                     aria-label="Time"
                                     value={addUnderTime}
                                     onChange={(e) => setAddUnderTime(e.target.value)}
-                                    onClick={(e) => e.currentTarget.showPicker?.()}
+                                    onClick={(e) => {
+                                      if (!addUnderTime) setAddUnderTime(getCurrentTime24());
+                                      e.currentTarget.showPicker?.();
+                                    }}
+                                    onFocus={(e) => {
+                                      if (!addUnderTime) setAddUnderTime(getCurrentTime24());
+                                    }}
                                     className="text-xs h-8 cursor-pointer"
                                   />
                                   <select
